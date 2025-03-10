@@ -7,7 +7,12 @@ module.exports = {
       "./app/**/*.{js,ts,jsx,tsx,mdx}",],
     theme: {
       extend: {
-      
+        animation: {
+          'ping-slow': 'ping 3s cubic-bezier(0, 0, 0.2, 1) infinite',
+          'wave-slow': 'wave 25s linear infinite',
+          'wave-normal': 'wave 15s linear infinite',
+          'wave-fast': 'wave 10s linear infinite',
+        },
         height: {
           '26': '6.8rem',
           '27': '7.0rem',
@@ -25,7 +30,11 @@ module.exports = {
           '66': '17.5rem'
         },
         keyframes: {
-
+          wave: {
+            '0%': { transform: 'translateX(0)' },
+            '50%': { transform: 'translateX(-50%)' },
+            '100%': { transform: 'translateX(-50%)' },
+          },
         },
         utilities: {
 
