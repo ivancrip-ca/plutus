@@ -1,15 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { auth } from '../firebase';
-import { useAuth } from '../contexts/AuthContext';
-import { 
-  MdDashboard, MdAccountBalance, MdAttachMoney, MdTrendingUp, 
-  MdPieChart, MdSettings, MdLogout, MdMenu, MdClose,
-  MdAdd, MdMoreVert, MdNotifications
-} from 'react-icons/md';
-import DashboardHeader from '../../components/dashboard/DashboardHeader';
-import DashboardSidebar from '../../components/dashboard/DashboardSidebar';
+import { useState } from 'react';
 import AccountSummary from '../../components/dashboard/AccountSummary';
 import RecentTransactions from '../../components/dashboard/RecentTransactions';
 import SpendingChart from '../../components/dashboard/SpendingChart';
@@ -17,27 +7,6 @@ import BudgetOverview from '../../components/dashboard/BudgetOverview';
 import FinancialGoals from '../../components/dashboard/FinancialGoals';
 
 const DashboardPage = () => {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { currentUser, userData } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState('overview');
-  
-  // Detectar sección activa basada en la ruta
-  useEffect(() => {
-    if (pathname.includes('/gestion_usuarios')) {
-      setActiveSection('user_management');
-    } else if (pathname.includes('/perfil')) {
-      setActiveSection('user_settings');
-    } else if (pathname.includes('/seguridad')) {
-      setActiveSection('security');
-    } else if (pathname.includes('/ayuda')) {
-      setActiveSection('help');
-    } else {
-      setActiveSection('overview');
-    }
-  }, [pathname]);
-  
   // Datos simulados para mostrar en el dashboard
   const [accountData, setAccountData] = useState({
     totalBalance: 25750.85,
@@ -120,141 +89,58 @@ const DashboardPage = () => {
     ]
   });
 
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-      router.push('/');
-    } catch (error) {
-      console.error("Error al cerrar sesión:", error);
-    }
-  };
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
-      {/* Sidebar */}
-      <DashboardSidebar 
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
-        handleLogout={handleLogout}
-        user={currentUser}
-        userData={userData}
-      />
-
-      {/* Main Content */}
-      <div className="flex flex-col w-0 flex-1 overflow-hidden">
-        <DashboardHeader 
-          toggleSidebar={toggleSidebar}
-          user={currentUser}
-          userData={userData}
+    <>
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+      
+      {/* Resumen financiero */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">Resumen Financiero</h2>
+        <AccountSummary 
+          balance={accountData.totalBalance}
+          income={accountData.income}
+          expenses={accountData.expenses}
+          savings={accountData.savings}
+          currencySymbol={accountData.currencySymbol}
+          accounts={accountData.accounts}
         />
-
-        {/* Main content */}
-        <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-            </div>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              {/* Contenido principal del dashboard */}
-              <div className="py-4">
-                {activeSection === 'overview' && (
-                  <>
-                    {/* Resumen financiero */}
-                    <div className="mb-6">
-                      <h2 className="text-lg font-semibold text-gray-800 mb-3">Resumen Financiero</h2>
-                      <AccountSummary 
-                        balance={accountData.totalBalance}
-                        income={accountData.income}
-                        expenses={accountData.expenses}
-                        savings={accountData.savings}
-                        currencySymbol={accountData.currencySymbol}
-                        accounts={accountData.accounts}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                      {/* Gráfico de gastos */}
-                      <div className="col-span-1 lg:col-span-1">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
-                          <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribución de Gastos</h2> {/* Aumentar espaciado inferior */}
-                          <SpendingChart data={chartData.expenses} />
-                        </div>
-                      </div>
-                      
-                      {/* Budget overview */}
-                      <div className="col-span-1 lg:col-span-2">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
-                          <h2 className="text-lg font-semibold text-gray-800 mb-4">Presupuestos</h2> {/* Aumentar espaciado inferior */}
-                          <BudgetOverview budgets={budgets} />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                      {/* Objetivos financieros */}
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Objetivos Financieros</h2> {/* Aumentar espaciado inferior */}
-                        <FinancialGoals goals={goals} />
-                      </div>
-                      
-                      {/* Transacciones recientes */}
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Transacciones Recientes</h2> {/* Aumentar espaciado inferior */}
-                        <RecentTransactions 
-                          transactions={transactions} 
-                          currencySymbol={accountData.currencySymbol} 
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-                
-                {activeSection === 'accounts' && (
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-3">Mis Cuentas</h2>
-                    <p>Sección de gestión de cuentas.</p>
-                  </div>
-                )}
-                
-                {activeSection === 'transactions' && (
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-3">Transacciones</h2>
-                    <p>Sección completa de transacciones.</p>
-                  </div>
-                )}
-                
-                {activeSection === 'budget' && (
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-3">Presupuestos</h2>
-                    <p>Gestión detallada de presupuestos.</p>
-                  </div>
-                )}
-                
-                {activeSection === 'reports' && (
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-3">Informes y Análisis</h2>
-                    <p>Sección de informes financieros.</p>
-                  </div>
-                )}
-                
-                {activeSection === 'settings' && (
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-lg font-semibold text-gray-800 mb-3">Configuración</h2>
-                    <p>Ajustes de tu cuenta y preferencias.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </main>
       </div>
-    </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        {/* Gráfico de gastos */}
+        <div className="col-span-1 lg:col-span-1">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribución de Gastos</h2>
+            <SpendingChart data={chartData.expenses} />
+          </div>
+        </div>
+        
+        {/* Budget overview */}
+        <div className="col-span-1 lg:col-span-2">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Presupuestos</h2>
+            <BudgetOverview budgets={budgets} />
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Objetivos financieros */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Objetivos Financieros</h2>
+          <FinancialGoals goals={goals} />
+        </div>
+        
+        {/* Transacciones recientes */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Transacciones Recientes</h2>
+          <RecentTransactions 
+            transactions={transactions} 
+            currencySymbol={accountData.currencySymbol} 
+          />
+        </div>
+      </div>
+    </>
   );
 };
 

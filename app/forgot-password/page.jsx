@@ -145,7 +145,7 @@ const ForgotPasswordPage = () => {
                     
                     <div className="mt-6 text-center">
                         <p className="text-sm text-gray-600">
-                            <Link href="/" className="font-medium text-cyan-600 hover:text-cyan-500">
+                            <Link href="/login" className="font-medium text-cyan-600 hover:text-cyan-500">
                                 Volver a iniciar sesión
                             </Link>
                         </p>

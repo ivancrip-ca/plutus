@@ -7,7 +7,48 @@ import WaveAnimation from '../../components/WaveAnimation';
 import { useRouter } from 'next/navigation';
 import { auth, googleProvider, facebookProvider } from '../firebase';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { saveUserToFirestore } from '../utils/userFunctions';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase'; // Import just the db instance
+
+// Add the missing function
+const saveUserToFirestore = async (user, userData, permitOffline = false) => {
+    try {
+        // Create a reference to the user document in Firestore
+        const userRef = doc(db, 'users', user.uid);
+        
+        // Check if the user document already exists
+        const userDoc = await getDoc(userRef);
+        
+        if (userDoc.exists()) {
+            // If the user exists, update only the provided fields
+            // This preserves existing data like registrationDate and registrationMethod
+            await setDoc(userRef, userData, { merge: true });
+            console.log('User data updated in Firestore');
+        } else {
+            // If user doesn't exist, create a new document
+            // Set registration date if not already provided
+            if (!userData.registrationDate) {
+                userData.registrationDate = new Date().toISOString();
+            }
+            await setDoc(userRef, userData);
+            console.log('New user created in Firestore');
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error saving user to Firestore:', error);
+        
+        // If we're permitting offline operation and encounter a network error,
+        // don't throw - the data will sync when connection is restored
+        if (permitOffline && error.code === 'failed-precondition') {
+            console.warn('Offline mode: Changes will sync when connection is restored.');
+            return true;
+        }
+        
+        // Re-throw if we're not permitting offline or for other errors
+        throw error;
+    }
+};
 
 const PageLogin = () => {
     const router = useRouter();

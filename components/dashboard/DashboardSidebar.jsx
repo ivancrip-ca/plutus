@@ -5,6 +5,7 @@ import {
   MdExpandLess, MdCloud, MdPeople, MdPerson, MdSecurity, MdHelp
 } from 'react-icons/md';
 import Image from 'next/image'; // Importar Image desde next/image
+import Link from 'next/link'; // Añadimos la importación de Link
 import { useRouter } from 'next/navigation'; // Importar useRouter para la navegación
 
 const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiveSection, handleLogout, user, userData }) => {
@@ -21,6 +22,20 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
       ...expandedMenus,
       [menuId]: !expandedMenus[menuId]
     });
+  };
+
+  // Mapear secciones a sus rutas correspondientes
+  const sectionToPath = {
+    overview: '/dashboard',
+    accounts: '/dashboard/accounts',
+    transactions: '/dashboard/transactions',
+    budget: '/dashboard/budget',
+    reports: '/dashboard/reports',
+    cloud: '/dashboard/cloud',
+    user_settings: '/dashboard/configuracion/perfil',
+    user_management: '/dashboard/configuracion/gestion_usuarios',
+    security: '/dashboard/configuracion/seguridad',
+    help: '/dashboard/configuracion/ayuda'
   };
 
   const navItems = [
@@ -84,22 +99,11 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
           {expandedMenus[item.id] && (
             <div className="pl-10 space-y-1">
               {item.submenu.map(subItem => (
-                <a
+                <Link
                   key={subItem.id}
+                  href={sectionToPath[subItem.id]}
                   onClick={() => {
                     setActiveSection(subItem.id);
-                    
-                    // Navegar directamente a la página correspondiente según el ID
-                    if (subItem.id === 'user_management') {
-                      router.push('/dashboard/configuracion/gestion_usuarios');
-                    } else if (subItem.id === 'user_settings') {
-                      router.push('/dashboard/configuracion/perfil');
-                    } else if (subItem.id === 'security') {
-                      router.push('/dashboard/configuracion/seguridad');
-                    } else if (subItem.id === 'help') {
-                      router.push('/dashboard/configuracion/ayuda');
-                    }
-                    
                     if (window.innerWidth < 768) {
                       setSidebarOpen(false);
                     }
@@ -112,7 +116,7 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
                 >
                   <div className="mr-3 flex-shrink-0 text-cyan-200">{subItem.icon}</div>
                   {subItem.name}
-                </a>
+                </Link>
               ))}
             </div>
           )}
@@ -120,16 +124,11 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
       );
     } else {
       return (
-        <a
+        <Link
           key={item.id}
+          href={sectionToPath[item.id]}
           onClick={() => {
             setActiveSection(item.id);
-            
-            // Redireccionar a la página principal del dashboard cuando se hace clic en resumen
-            if (item.id === 'overview') {
-              router.push('/dashboard');
-            }
-            
             if (window.innerWidth < 768) {
               setSidebarOpen(false);
             }
@@ -142,7 +141,7 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
         >
           <div className="mr-3 flex-shrink-0 text-cyan-200">{item.icon}</div>
           {item.name}
-        </a>
+        </Link>
       );
     }
   };
@@ -204,15 +203,15 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
                 {navItems.map(item => renderNavItem(item))}
                 
                 {/* Logout button - Añadiendo más separación */}
-                <a
+                <button
                   onClick={handleLogout}
-                  className="mt-4 text-cyan-100 hover:bg-cyan-700 group flex items-center px-3 py-3 text-base font-medium rounded-md cursor-pointer transition-colors duration-150"
+                  className="mt-4 text-cyan-100 hover:bg-cyan-700 group flex items-center px-3 py-3 text-base font-medium rounded-md cursor-pointer transition-colors duration-150 w-full"
                 >
                   <div className="mr-4 flex-shrink-0 text-cyan-200">
                     <MdLogout className="w-6 h-6" />
                   </div>
                   Cerrar sesión
-                </a>
+                </button>
               </nav>
             </div>
           </div>
@@ -256,15 +255,15 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
                 {navItems.map(item => renderNavItem(item))}
                 
                 {/* Logout button - Añadiendo más separación */}
-                <a
+                <button
                   onClick={handleLogout}
-                  className="mt-6 text-cyan-100 hover:bg-cyan-700 group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150"
+                  className="mt-6 text-cyan-100 hover:bg-cyan-700 group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150 w-full"
                 >
                   <div className="mr-3 flex-shrink-0 text-cyan-200">
                     <MdLogout className="w-6 h-6" />
                   </div>
                   Cerrar sesión
-                </a>
+                </button>
               </nav>
             </div>
             

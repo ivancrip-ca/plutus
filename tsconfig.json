@@ -29,7 +29,7 @@
     ".next/types/**/*.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "components/almacenamiento/BarraAlmacenamiento.jsx", "components/almacenamiento/BreadcrumbNavigation.jsx", "components/almacenamiento/ConfirmDelete.jsx", "components/almacenamiento/FileCard.jsx", "components/almacenamiento/FilePreviewModal.jsx", "components/almacenamiento/FloatingActionButton.jsx", "components/almacenamiento/FolderCard.jsx", "components/almacenamiento/NavigationBar.jsx", "components/almacenamiento/ProtectItemModal.jsx", "components/almacenamiento/RenderFileMenu.jsx", "components/almacenamiento/RenderFolderMenu.jsx", "components/almacenamiento/SelectionBar.jsx", "components/almacenamiento/ShareModal.jsx", "components/almacenamiento/SortingHeader.jsx", "components/almacenamiento/StoragePlansModal.jsx", "components/almacenamiento/UnlockItemModal.jsx", "components/almacenamiento/UploadModal.jsx", "components/almacenamiento/UploadQueue.jsx"  ],
   "exclude": [
     "node_modules"
   ]

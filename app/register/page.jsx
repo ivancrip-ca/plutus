@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import WaveAnimation from '../../components/WaveAnimation';
 import { auth } from '../firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { saveUserToFirestore } from '../utils/userFunctions';
+import { saveUserToFirestore } from '../firebase/firestoreUtils';
 
 const PageRegister = () => {
     const router = useRouter();
