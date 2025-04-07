@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MdDashboard, MdAccountBalance, MdAttachMoney, MdTrendingUp,
   MdPieChart, MdSettings, MdLogout, MdClose, MdExpandMore,
@@ -7,10 +7,27 @@ import {
 import Image from 'next/image'; // Importar Image desde next/image
 import Link from 'next/link'; // Añadimos la importación de Link
 import { useRouter } from 'next/navigation'; // Importar useRouter para la navegación
+import { useTheme } from '../../app/contexts/ThemeContext'; // Import useTheme hook
 
-const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiveSection, handleLogout, user, userData }) => {
+const DashboardSidebar = ({ 
+  sidebarOpen, 
+  setSidebarOpen, 
+  activeSection, 
+  setActiveSection, 
+  handleLogout, 
+  user, 
+  userData,
+  darkMode: darkModeProp = false // Keep darkMode prop for backward compatibility, but don't use it directly
+}) => {
   const router = useRouter(); // Inicializar el router
-  
+  const { darkMode } = useTheme(); // Use ThemeContext to get global dark mode state
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure component is mounted before using darkMode from context
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // State for tracking expanded submenus
   const [expandedMenus, setExpandedMenus] = useState({
     settings: false
@@ -36,6 +53,22 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
     user_management: '/dashboard/configuracion/gestion_usuarios',
     security: '/dashboard/configuracion/seguridad',
     help: '/dashboard/configuracion/ayuda'
+  };
+
+  // Define color schemes for dark and light modes
+  const colors = {
+    sidebar: darkMode ? 'bg-slate-800' : 'bg-cyan-600',
+    sidebarText: darkMode ? 'text-gray-100' : 'text-white',
+    sidebarSubtext: darkMode ? 'text-gray-300' : 'text-cyan-100',
+    iconColor: darkMode ? 'text-gray-300' : 'text-cyan-200',
+    navItemActive: darkMode ? 'bg-slate-700' : 'bg-cyan-700 bg-opacity-75',
+    navItemHover: darkMode ? 'hover:bg-slate-700' : 'hover:bg-cyan-700',
+    submenuActive: darkMode ? 'bg-slate-600' : 'bg-cyan-800',
+    border: darkMode ? 'border-slate-700' : 'border-cyan-500',
+    borderBottom: darkMode ? 'border-slate-600' : 'border-cyan-700',
+    badgeBg: darkMode ? 'bg-slate-600' : 'bg-cyan-700',
+    badgeText: darkMode ? 'text-gray-200' : 'text-cyan-100',
+    backdrop: darkMode ? 'bg-black bg-opacity-75' : 'bg-gray-800 bg-opacity-75'
   };
 
   const navItems = [
@@ -82,17 +115,17 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
             onClick={() => toggleSubmenu(item.id)}
             className={`${
               activeSection === item.id || (expandedMenus[item.id] && item.submenu.some(sub => activeSection === sub.id))
-                ? 'bg-cyan-700 bg-opacity-75 text-white'
-                : 'text-cyan-100 hover:bg-cyan-700'
+                ? colors.navItemActive + ' ' + colors.sidebarText
+                : colors.sidebarSubtext + ' ' + colors.navItemHover
             } group flex items-center justify-between px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150`}
           >
             <div className="flex items-center">
-              <div className="mr-3 flex-shrink-0 text-cyan-200">{item.icon}</div>
+              <div className={`mr-3 flex-shrink-0 ${colors.iconColor}`}>{item.icon}</div>
               {item.name}
             </div>
             {expandedMenus[item.id] ? 
-              <MdExpandLess className="flex-shrink-0 text-cyan-200" /> : 
-              <MdExpandMore className="flex-shrink-0 text-cyan-200" />
+              <MdExpandLess className={`flex-shrink-0 ${colors.iconColor}`} /> : 
+              <MdExpandMore className={`flex-shrink-0 ${colors.iconColor}`} />
             }
           </a>
           
@@ -110,11 +143,11 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
                   }}
                   className={`${
                     activeSection === subItem.id
-                      ? 'bg-cyan-800 text-white'
-                      : 'text-cyan-100 hover:bg-cyan-700'
+                      ? colors.submenuActive + ' ' + colors.sidebarText
+                      : colors.sidebarSubtext + ' ' + colors.navItemHover
                   } group flex items-center px-3 py-2 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150`}
                 >
-                  <div className="mr-3 flex-shrink-0 text-cyan-200">{subItem.icon}</div>
+                  <div className={`mr-3 flex-shrink-0 ${colors.iconColor}`}>{subItem.icon}</div>
                   {subItem.name}
                 </Link>
               ))}
@@ -135,16 +168,29 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
           }}
           className={`${
             activeSection === item.id
-              ? 'bg-cyan-700 bg-opacity-75 text-white'
-              : 'text-cyan-100 hover:bg-cyan-700'
+              ? colors.navItemActive + ' ' + colors.sidebarText
+              : colors.sidebarSubtext + ' ' + colors.navItemHover
           } group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150`}
         >
-          <div className="mr-3 flex-shrink-0 text-cyan-200">{item.icon}</div>
+          <div className={`mr-3 flex-shrink-0 ${colors.iconColor}`}>{item.icon}</div>
           {item.name}
         </Link>
       );
     }
   };
+
+  // Show minimal content during server rendering
+  if (!mounted) {
+    return (
+      <div className="hidden md:flex md:flex-shrink-0">
+        <div className="flex flex-col w-64">
+          <div className="flex flex-col h-0 flex-1 bg-cyan-600">
+            {/* Minimal placeholder during hydration */}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -153,12 +199,12 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
         <div className="fixed inset-0 z-40 flex md:hidden">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-gray-800 bg-opacity-75"
+            className={`fixed inset-0 ${colors.backdrop}`}
             onClick={() => setSidebarOpen(false)}
           />
           
-          {/* Sidebar content - Cambiando a un color sólido de azul cyan */}
-          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-cyan-600 text-white">
+          {/* Sidebar content */}
+          <div className={`relative flex-1 flex flex-col max-w-xs w-full ${colors.sidebar} ${colors.sidebarText}`}>
             {/* Close button */}
             <div className="absolute top-0 right-0 -mr-12 pt-2">
               <button
@@ -172,13 +218,12 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
             
             {/* Brand/logo */}
             <div className="flex-shrink-0 flex items-center px-4 py-6 ">
-              <h1 className="text-2xl font-bold text-center">Plutus</h1>
+              <h1 className={`text-2xl font-bold text-center ${colors.sidebarText}`}>Plutus</h1>
             </div>
             
-            {/* User info - Modificando bordes */}
-            <div className="flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-cyan-500 border-b">
+            {/* User info */}
+            <div className={`flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-b ${colors.border}`}>
               <div className="relative w-16 h-16 rounded-full overflow-hidden mb-2">
-                {/* Reemplazar Image con img */}
                 <Image
                   src="/images/logoPlus.png"
                   alt={userName}
@@ -189,25 +234,25 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
                 />
               </div>
               <div className="text-center">
-                <p className="text-sm font-medium">{userName}</p>
-                <p className="text-xs text-cyan-100 truncate">{userEmail}</p>
-                <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-cyan-700 text-cyan-100">
+                <p className={`text-sm font-medium ${colors.sidebarText}`}>{userName}</p>
+                <p className={`text-xs ${colors.sidebarSubtext} truncate`}>{userEmail}</p>
+                <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium ${colors.badgeBg} ${colors.badgeText}`}>
                   {registrationMethod}
                 </span>
               </div>
             </div>
             
-            {/* Navigation - Manteniendo el espaciado mejorado */}
+            {/* Navigation */}
             <div className="mt-6 flex-1 flex flex-col overflow-y-auto">
-              <nav className="flex-1 px-3 pb-4 space-y-3"> {/* Aumentar espaciado vertical */}
+              <nav className="flex-1 px-3 pb-4 space-y-3">
                 {navItems.map(item => renderNavItem(item))}
                 
-                {/* Logout button - Añadiendo más separación */}
+                {/* Logout button */}
                 <button
                   onClick={handleLogout}
-                  className="mt-4 text-cyan-100 hover:bg-cyan-700 group flex items-center px-3 py-3 text-base font-medium rounded-md cursor-pointer transition-colors duration-150 w-full"
+                  className={`mt-4 ${colors.sidebarSubtext} ${colors.navItemHover} group flex items-center px-3 py-3 text-base font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
                 >
-                  <div className="mr-4 flex-shrink-0 text-cyan-200">
+                  <div className={`mr-4 flex-shrink-0 ${colors.iconColor}`}>
                     <MdLogout className="w-6 h-6" />
                   </div>
                   Cerrar sesión
@@ -221,17 +266,16 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
       {/* Desktop sidebar (always visible) */}
       <div className="hidden md:flex md:flex-shrink-0">
         <div className="flex flex-col w-64">
-          <div className="flex flex-col h-0 flex-1 bg-cyan-600">
+          <div className={`flex flex-col h-0 flex-1 ${colors.sidebar}`}>
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               {/* Brand/logo */}
               <div className="flex items-center flex-shrink-0 px-4 py-4">
-                <h1 className="text-2xl font-bold text-white">Plutus</h1>
+                <h1 className={`text-2xl font-bold ${colors.sidebarText}`}>Plutus</h1>
               </div>
               
-              {/* User info - Modificando bordes y colores */}
-              <div className="flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-cyan-500 border-b">
+              {/* User info */}
+              <div className={`flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-b ${colors.border}`}>
                 <div className="relative w-16 h-16 rounded-full overflow-hidden mb-2">
-                  {/* Reemplazar Image con img */}
                   <Image
                     src="/images/logoPlutus.png"
                     alt={userName}
@@ -242,24 +286,24 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
                   />
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-medium text-white">{userName}</p>
-                  <p className="text-xs text-cyan-100 truncate">{userEmail}</p>
-                  <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium bg-cyan-700 text-cyan-100">
+                  <p className={`text-sm font-medium ${colors.sidebarText}`}>{userName}</p>
+                  <p className={`text-xs ${colors.sidebarSubtext} truncate`}>{userEmail}</p>
+                  <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium ${colors.badgeBg} ${colors.badgeText}`}>
                     {registrationMethod}
                   </span>
                 </div>
               </div>
               
-              {/* Navigation - Aumentando el espaciado entre elementos */}
-              <nav className="mt-6 flex-1 px-3 space-y-3"> {/* Aumentar espaciado vertical */}
+              {/* Navigation */}
+              <nav className="mt-6 flex-1 px-3 space-y-3">
                 {navItems.map(item => renderNavItem(item))}
                 
-                {/* Logout button - Añadiendo más separación */}
+                {/* Logout button */}
                 <button
                   onClick={handleLogout}
-                  className="mt-6 text-cyan-100 hover:bg-cyan-700 group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150 w-full"
+                  className={`mt-6 ${colors.sidebarSubtext} ${colors.navItemHover} group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
                 >
-                  <div className="mr-3 flex-shrink-0 text-cyan-200">
+                  <div className={`mr-3 flex-shrink-0 ${colors.iconColor}`}>
                     <MdLogout className="w-6 h-6" />
                   </div>
                   Cerrar sesión
@@ -267,10 +311,10 @@ const DashboardSidebar = ({ sidebarOpen, setSidebarOpen, activeSection, setActiv
               </nav>
             </div>
             
-            {/* Version info - Cambiando el color del borde */}
-            <div className="flex-shrink-0 flex border-t border-cyan-700 p-4">
+            {/* Version info */}
+            <div className={`flex-shrink-0 flex border-t ${colors.borderBottom} p-4`}>
               <div className="flex-shrink-0 w-full group block">
-                <p className="text-xs text-cyan-200 text-center">
+                <p className={`text-xs ${colors.sidebarSubtext} text-center`}>
                   Plutus v1.0.0
                 </p>
               </div>

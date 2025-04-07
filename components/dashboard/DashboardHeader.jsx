@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
-import { MdMenu, MdNotifications, MdAdd, MdSearch } from 'react-icons/md';
+import React, { useState, useEffect } from 'react';
+import { MdMenu, MdNotifications, MdAdd, MdSearch, MdLightMode, MdDarkMode } from 'react-icons/md';
 import Image from 'next/image';
+import { useTheme } from '../../app/contexts/ThemeContext';
 
 const DashboardHeader = ({ toggleSidebar, user, userData }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const { darkMode, toggleDarkMode } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  // Ensure component is mounted before rendering theme-dependent UI
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   const userName = userData?.firstName || user?.displayName?.split(' ')[0] || 'Usuario';
   const userPhoto = user?.photoURL || '/images/logoPlutus.png';
@@ -28,15 +35,37 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
     e.target.src = '';
   };
 
+  // Handle theme toggle with logging
+  const handleThemeToggle = () => {
+    console.log('Theme toggle clicked, current mode:', darkMode);
+    toggleDarkMode();
+  };
+
+  // Don't render theme-specific elements until client-side hydration is complete
+  if (!mounted) {
+    return (
+      <header className="bg-white shadow-sm z-10">
+        {/* Minimal header during SSR/hydration */}
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Loading placeholder */}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
-    <header className="bg-white shadow-sm z-10">
+    <header className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} shadow-sm z-10`}>
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             {/* Mobile menu button */}
             <button
               type="button"
-              className="inline-flex md:hidden items-center justify-center p-2 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500"
+              className={`inline-flex md:hidden items-center justify-center p-2 rounded-md ${
+                darkMode ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+              } focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500`}
               onClick={toggleSidebar}
             >
               <span className="sr-only">Abrir menú</span>
@@ -47,10 +76,12 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
             <div className="hidden md:block ml-4">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MdSearch className="h-5 w-5 text-gray-400" />
+                  <MdSearch className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
                 </div>
                 <input
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-md leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 sm:text-sm"
+                  className={`block w-full pl-10 pr-3 py-2 border ${
+                    darkMode ? 'border-gray-700 bg-gray-700 placeholder-gray-400 text-white' : 'border-gray-200 bg-gray-50 placeholder-gray-500'
+                  } rounded-md leading-5 focus:outline-none focus:placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 sm:text-sm`}
                   placeholder="Buscar transacciones, categorías..."
                   type="search"
                 />
@@ -59,102 +90,41 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
           </div>
           
           <div className="flex items-center">
-            {/* Add transaction button - Cambiando a un color sólido */}
-            <div className="relative">
+            {/* Theme toggle button */}
+            <button
+              type="button"
+              className={`p-1 rounded-full cursor-pointer ${
+                darkMode ? 'bg-gray-700 text-yellow-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500`}
+              onClick={handleThemeToggle}
+            >
+              <span className="sr-only">Cambiar tema</span>
+              {darkMode ? <MdLightMode className="h-6 w-6" /> : <MdDarkMode className="h-6 w-6" />}
+            </button>
+            
+            {/* Add transaction button */}
+            <div className="relative ml-4">
               <button
                 type="button"
                 className="bg-cyan-600 p-1 rounded-full text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
                 onClick={() => setShowAddMenu(!showAddMenu)}
               >
-                <span className="sr-only">Agregar transacción</span>
+                <span className="sr-only">Add transaction</span>
                 <MdAdd className="h-6 w-6" />
               </button>
-              
-              {/* Add menu dropdown */}
-              {showAddMenu && (
-                <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                  {addMenuItems.map((item) => (
-                    <a
-                      key={item.id}
-                      href="#"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setShowAddMenu(false);
-                      }}
-                    >
-                      {item.label}
-                    </a>
-                  ))}
-                </div>
-              )}
             </div>
             
-            {/* Notifications */}
-            <div className="relative ml-4">
-              <button
-                type="button"
-                className="bg-gray-100 p-1 rounded-full text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                onClick={() => setShowNotifications(!showNotifications)}
-              >
-                <span className="sr-only">Ver notificaciones</span>
-                <MdNotifications className="h-6 w-6" />
-                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
-              </button>
-              
-              {/* Notifications dropdown */}
-              {showNotifications && (
-                <div className="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <h3 className="text-sm font-medium text-gray-900">Notificaciones</h3>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <a
-                        key={notification.id}
-                        href="#"
-                        className="block px-4 py-3 hover:bg-gray-100"
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            <span className="inline-block h-8 w-8 rounded-full bg-cyan-100 text-cyan-500 flex items-center justify-center">
-                              <MdNotifications className="h-5 w-5" />
-                            </span>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">{notification.title}</p>
-                            <p className="text-sm text-gray-500">{notification.message}</p>
-                            <p className="text-xs text-gray-400">{notification.time}</p>
-                          </div>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* User profile */}
-            <div className="ml-4 relative">
+            {/* Profile dropdown */}
+            <div className="ml-3 relative">
               <div>
-                <button
-                  type="button"
-                  className="bg-gray-100 flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                  id="user-menu-button"
-                  aria-expanded="false"
-                  aria-haspopup="true"
-                >
-                  <span className="sr-only">Abrir menú de usuario</span>
-                  <img
-                    className="h-8 w-8 rounded-full object-cover"
-                    src={userPhoto}
-                    alt={userName || "Usuario"}
-                    width="32"
-                    height="32"
-                    onError={handleImageError}
-                  />
-                </button>
+                <Image 
+                  className="h-8 w-8 rounded-full" 
+                  src={userPhoto} 
+                  alt={`${userName}'s profile`}
+                  width={32}
+                  height={32}
+                  onError={handleImageError}
+                />
               </div>
             </div>
           </div>

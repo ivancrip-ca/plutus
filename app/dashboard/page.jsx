@@ -1,12 +1,20 @@
 'use client'
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AccountSummary from '../../components/dashboard/AccountSummary';
 import RecentTransactions from '../../components/dashboard/RecentTransactions';
 import SpendingChart from '../../components/dashboard/SpendingChart';
 import BudgetOverview from '../../components/dashboard/BudgetOverview';
 import FinancialGoals from '../../components/dashboard/FinancialGoals';
+import { useTheme } from '../../app/contexts/ThemeContext';
 
 const DashboardPage = () => {
+  const { darkMode } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Datos simulados para mostrar en el dashboard
   const [accountData, setAccountData] = useState({
     totalBalance: 25750.85,
@@ -89,13 +97,27 @@ const DashboardPage = () => {
     ]
   });
 
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-6"></div>
+        <div className="space-y-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-40 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+    <div className={`p-6 ${darkMode ? 'bg-gray-900' : 'text-gray-900'}`}>
+      <h1 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'} mb-6`}>Dashboard</h1>
       
       {/* Resumen financiero */}
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-3">Resumen Financiero</h2>
+        <h2 className={`text-lg font-semibold ${darkMode ? 'text-gray-100' : 'text-gray-800'} mb-3`}>Resumen Financiero</h2>
         <AccountSummary 
           balance={accountData.totalBalance}
           income={accountData.income}
@@ -109,16 +131,16 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {/* Gráfico de gastos */}
         <div className="col-span-1 lg:col-span-1">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribución de Gastos</h2>
+          <div className={`p-6 rounded-xl shadow-sm border h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+            <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Distribución de Gastos</h2>
             <SpendingChart data={chartData.expenses} />
           </div>
         </div>
         
         {/* Budget overview */}
         <div className="col-span-1 lg:col-span-2">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-full">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Presupuestos</h2>
+          <div className={`p-6 rounded-xl shadow-sm border h-full ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+            <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Presupuestos</h2>
             <BudgetOverview budgets={budgets} />
           </div>
         </div>
@@ -126,21 +148,21 @@ const DashboardPage = () => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Objetivos financieros */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Objetivos Financieros</h2>
+        <div className={`p-6 rounded-xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Objetivos Financieros</h2>
           <FinancialGoals goals={goals} />
         </div>
         
         {/* Transacciones recientes */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Transacciones Recientes</h2>
+        <div className={`p-6 rounded-xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Transacciones Recientes</h2>
           <RecentTransactions 
             transactions={transactions} 
             currencySymbol={accountData.currencySymbol} 
           />
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
