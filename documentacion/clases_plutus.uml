@@ -1,0 +1,75 @@
+@startuml
+skinparam RectangleFontSize 14
+skinparam ActorFontSize 14
+skinparam UseCaseFontSize 12
+skinparam ArrowColor #4A90E2
+skinparam ActorBorderColor #4A90E2
+skinparam RectangleBorderColor #4A90E2
+skinparam BackgroundColor #f5f5f5
+skinparam UseCaseBackgroundColor #ffffff
+skinparam UseCaseBorderColor #4A90E2
+skinparam ArrowThickness 2
+skinparam RoundCorner 10
+skinparam RectangleStereotypeFontSize 12
+
+left to right direction
+
+actor "Administrador" as Admin #LightBlue
+actor "Usuario Normal" as User #LightGreen
+
+rectangle "Plutus (Sistema Financiero)" {
+    
+    ' Casos de uso del Administrador
+    Admin --> (Otorgar permisos en la nube) #LightBlue
+    Admin --> (Control de secciones/módulos de aplicación) #LightBlue
+    Admin --> (Modificaciones del sistema) #LightBlue
+    Admin --> (Crear apartados) #LightBlue
+    Admin --> (Agregar métodos de pago) #LightBlue
+    Admin --> (Hacer modificaciones del dinero) #LightBlue
+    Admin --> (Hacer metas económicas) #LightBlue
+    Admin --> (Control de gastos) #LightBlue
+    Admin --> (Control de sistema de inversiones) #LightBlue
+
+    ' Detalles adicionales para "Otorgar permisos en la nube"
+    (Otorgar permisos en la nube) --> (Creación y manejo de archivos y carpetas) : <<include>> #LightBlue
+    (Otorgar permisos en la nube) --> (Configurar acceso a recursos) : <<include>> #LightBlue
+    (Otorgar permisos en la nube) --> (Comprar más espacio de almacenamiento) : <<include>> #LightBlue
+
+    ' Detalles adicionales para "Control de secciones/módulos de aplicación"
+    (Control de secciones/módulos de aplicación) --> (Activar/desactivar módulos) : <<include>> #LightBlue
+    (Control de secciones/módulos de aplicación) --> (Configurar secciones) : <<include>> #LightBlue
+    (Control de secciones/módulos de aplicación) --> (Gestionar permisos de módulos) : <<include>> #LightBlue
+
+    ' Detalles adicionales para "Modificaciones del sistema"
+    (Modificaciones del sistema) --> (Modo oscuro) : <<include>> #LightBlue
+    (Modificaciones del sistema) --> (Configurar parámetros del sistema) : <<include>> #LightBlue
+
+    ' Detalles adicionales para "Crear apartados"
+    (Crear apartados) --> (Definir objetivo del apartado) : <<include>> #LightBlue
+    (Crear apartados) --> (Establecer límite de aportaciones) : <<include>> #LightBlue
+    (Crear apartados) --> (Asignar fechas de retiro) : <<include>> #LightBlue
+
+    ' Casos de uso del Usuario Normal
+    User --> (Crear apartados) #LightGreen
+    User --> (Agregar métodos de pago) #LightGreen
+    User --> (Hacer modificaciones del dinero) #LightGreen
+    User --> (Hacer metas económicas) #LightGreen
+    User --> (Control de gastos) #LightGreen
+    User --> (Control de sistema de inversiones) #LightGreen
+
+    ' Relación con include y extend (rectas)
+    (Agregar métodos de pago) --> (Validación de tarjeta) : <<include>> #LightGreen
+    
+    (Hacer modificaciones del dinero) --> (Manejo de cargos y abonos) : <<include>> #LightGreen
+
+    (Hacer metas económicas) --> (Notificar meta cercana) : <<extend>> #LightGreen
+
+    (Control de gastos) --> (Generar reportes de gastos) : <<extend>> #LightGreen
+
+    (Control de sistema de inversiones) --> (Calcular rentabilidad) : <<include>> #LightGreen
+    (Control de sistema de inversiones) --> (Análisis de la bolsa) : <<include>> #LightGreen
+}
+
+@enduml
+
+
