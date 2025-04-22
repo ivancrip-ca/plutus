@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from "firebase/auth";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
-import { getStorage } from "firebase/storage"; // Importando Firebase Storage
+
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -32,9 +32,6 @@ const auth = getAuth(app);
 console.log("Initializing Firestore...");
 const db = getFirestore(app);
 
-// Initialize Firebase Storage
-console.log("Initializing Firebase Storage...");
-const storage = getStorage(app);
 
 // Configurar la persistencia sólo en el lado del cliente y sólo una vez
 if (typeof window !== 'undefined') {
@@ -73,5 +70,5 @@ const facebookProvider = new FacebookAuthProvider();
 
 console.log("Firebase initialization complete");
 
-export { auth, db, storage, googleProvider, facebookProvider }; // Exportando storage
+export { auth, db, googleProvider, facebookProvider }; // Exportando storage
 export default app;
