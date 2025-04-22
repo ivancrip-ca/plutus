@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-
-
-
 @tailwind utilities;
 
 /* Base styles */
@@ -15,5 +12,33 @@
   /* Dark mode styles for body */
   .dark body {
     @apply bg-gray-900 text-gray-100;
+  }
+}
+
+/* Animations para menús desplegables */
+@keyframes dropdown-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(4px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dropdown-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.9);
+    visibility: hidden;
   }
 }

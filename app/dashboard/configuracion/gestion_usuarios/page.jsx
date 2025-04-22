@@ -6,10 +6,13 @@ import {
 } from 'react-icons/md';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 const PageGestionUsuarios = () => {
   const router = useRouter();
   const { currentUser } = useAuth();
+  const { darkMode } = useTheme();
+  const [mounted, setMounted] = useState(false);
   
   // Estado para los usuarios
   const [users, setUsers] = useState([]);
@@ -83,6 +86,11 @@ const PageGestionUsuarios = () => {
     }
   ];
   
+  // Asegurar que el componente está montado antes de renderizar elementos dependientes del tema
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Cargar usuarios cuando el componente se monte
   useEffect(() => {
     // En un caso real, aquí cargaríamos los datos de una API
@@ -233,18 +241,39 @@ const PageGestionUsuarios = () => {
     );
   };
   
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="py-6 px-4 sm:px-6 lg:px-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
+          <div className="h-20 bg-gray-100 dark:bg-gray-800 rounded-lg mb-6"></div>
+          <div className="grid grid-cols-1 gap-4 mb-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-lg"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="py-6 px-4 sm:px-6 lg:px-8">
+    <div className={`py-6 px-4 sm:px-6 lg:px-8 ${darkMode ? 'bg-gray-900 text-white' : ''}`}>
       {/* Header con botón de volver */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
           <button 
             onClick={() => router.push('/dashboard')}
-            className="mr-4 p-2 rounded-full text-gray-600 hover:bg-gray-100"
+            className={`mr-4 p-2 rounded-full ${
+              darkMode 
+                ? 'text-gray-400 hover:bg-gray-800' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
           >
             <MdArrowBack className="w-6 h-6" />
           </button>
-          <h1 className="text-2xl font-semibold text-gray-900">Gestión de Usuarios</h1>
+          <h1 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Gestión de Usuarios</h1>
         </div>
         <button
           onClick={() => handleOpenModal('add')}
@@ -256,7 +285,7 @@ const PageGestionUsuarios = () => {
       </div>
       
       {/* Barra de búsqueda y filtrado */}
-      <div className="bg-white shadow px-4 py-5 sm:rounded-lg sm:p-6 mb-6">
+      <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} shadow px-4 py-5 sm:rounded-lg sm:p-6 mb-6`}>
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -267,15 +296,23 @@ const PageGestionUsuarios = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Buscar usuarios por nombre, correo o rol..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
+              className={`block w-full pl-10 pr-3 py-2 border rounded-md leading-5 ${
+                darkMode 
+                  ? 'bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:ring-cyan-500 focus:border-cyan-500' 
+                  : 'bg-white border-gray-300 placeholder-gray-500 text-gray-900 focus:ring-cyan-500 focus:border-cyan-500'
+              } sm:text-sm`}
             />
           </div>
           <div className="md:w-48">
             <button
               type="button"
-              className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+              className={`w-full inline-flex justify-center items-center px-4 py-2 border shadow-sm text-sm font-medium rounded-md ${
+                darkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              } focus:outline-none`}
             >
-              <MdFilterList className="mr-2 h-5 w-5 text-gray-400" />
+              <MdFilterList className={`mr-2 h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
               Filtrar
             </button>
           </div>
@@ -284,9 +321,9 @@ const PageGestionUsuarios = () => {
       
       {/* Lista de usuarios */}
       {isLoading ? (
-        <div className="text-center py-10">
+        <div className="text-center py-10 h-screen">
           <div className="spinner border-t-4 border-cyan-500 border-solid rounded-full w-12 h-12 mx-auto animate-spin"></div>
-          <p className="mt-3 text-gray-600">Cargando usuarios...</p>
+          <p className={`mt-3 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Cargando usuarios...</p>
         </div>
       ) : error ? (
         <div className="text-center py-10">
@@ -295,16 +332,16 @@ const PageGestionUsuarios = () => {
           </div>
         </div>
       ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} shadow overflow-hidden sm:rounded-md`}>
           {filteredUsers.length === 0 ? (
             <div className="text-center py-10">
-              <p className="text-gray-500">No se encontraron usuarios que coincidan con su búsqueda.</p>
+              <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>No se encontraron usuarios que coincidan con su búsqueda.</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-200">
+            <ul className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
               {filteredUsers.map(user => (
                 <li key={user.id}>
-                  <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                  <div className={`px-4 py-4 sm:px-6 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-12 w-12">
@@ -319,10 +356,10 @@ const PageGestionUsuarios = () => {
                           />
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                             {user.name}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             {user.email}
                           </div>
                           <div className="mt-1 flex">
@@ -334,13 +371,21 @@ const PageGestionUsuarios = () => {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleOpenModal('edit', user)}
-                          className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                          className={`inline-flex items-center p-2 border border-transparent rounded-full shadow-sm ${
+                            darkMode
+                              ? 'text-gray-300 hover:bg-gray-600'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500`}
                         >
                           <MdEdit className="h-5 w-5" />
                         </button>
                         <button
                           onClick={() => handleOpenModal('delete', user)}
-                          className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          className={`inline-flex items-center p-2 border border-transparent rounded-full shadow-sm ${
+                            darkMode
+                              ? 'text-gray-300 hover:bg-gray-600'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500`}
                         >
                           <MdDelete className="h-5 w-5 text-red-500" />
                         </button>
@@ -348,7 +393,7 @@ const PageGestionUsuarios = () => {
                     </div>
                     <div className="mt-2 sm:flex sm:justify-between">
                       <div className="sm:flex">
-                        <p className="flex items-center text-sm text-gray-500">
+                        <p className={`flex items-center text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                           Fecha de registro: {new Date(user.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -371,7 +416,7 @@ const PageGestionUsuarios = () => {
             
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
             
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className={`inline-block align-bottom rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               {/* Encabezado del modal */}
               <div className="bg-cyan-600 px-4 py-4 sm:px-6">
                 <div className="flex items-center justify-between">
@@ -389,7 +434,7 @@ const PageGestionUsuarios = () => {
               </div>
               
               {/* Contenido del modal */}
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-4 pt-5 pb-4 sm:p-6 sm:pb-4`}>
                 {modalMode === 'delete' ? (
                   <div>
                     <div className="sm:flex sm:items-start">
@@ -397,11 +442,11 @@ const PageGestionUsuarios = () => {
                         <MdDelete className="h-6 w-6 text-red-600" />
                       </div>
                       <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">
+                        <h3 className={`text-lg leading-6 font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           Eliminar usuario
                         </h3>
                         <div className="mt-2">
-                          <p className="text-sm text-gray-500">
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             ¿Estás seguro de que deseas eliminar a {selectedUser?.name}? Esta acción no se puede deshacer.
                           </p>
                         </div>
@@ -412,7 +457,7 @@ const PageGestionUsuarios = () => {
                   <form onSubmit={handleSubmit}>
                     <div className="grid grid-cols-1 gap-6">
                       <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="name" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                           Nombre completo
                         </label>
                         <input
@@ -422,12 +467,16 @@ const PageGestionUsuarios = () => {
                           value={formData.name}
                           onChange={handleInputChange}
                           required
-                          className="mt-1 focus:ring-cyan-500 focus:border-cyan-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className={`mt-1 block w-full shadow-sm sm:text-sm rounded-md ${
+                            darkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white focus:ring-cyan-500 focus:border-cyan-500' 
+                              : 'border-gray-300 focus:ring-cyan-500 focus:border-cyan-500'
+                          }`}
                         />
                       </div>
                       
                       <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="email" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                           Correo electrónico
                         </label>
                         <input
@@ -437,13 +486,17 @@ const PageGestionUsuarios = () => {
                           value={formData.email}
                           onChange={handleInputChange}
                           required
-                          className="mt-1 focus:ring-cyan-500 focus:border-cyan-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                          className={`mt-1 block w-full shadow-sm sm:text-sm rounded-md ${
+                            darkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white focus:ring-cyan-500 focus:border-cyan-500' 
+                              : 'border-gray-300 focus:ring-cyan-500 focus:border-cyan-500'
+                          }`}
                         />
                       </div>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="role" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                             Rol
                           </label>
                           <select
@@ -451,7 +504,11 @@ const PageGestionUsuarios = () => {
                             name="role"
                             value={formData.role}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
+                            className={`mt-1 block w-full py-2 px-3 border rounded-md shadow-sm sm:text-sm ${
+                              darkMode 
+                                ? 'bg-gray-700 border-gray-600 text-white focus:ring-cyan-500 focus:border-cyan-500' 
+                                : 'border-gray-300 bg-white focus:ring-cyan-500 focus:border-cyan-500'
+                            }`}
                           >
                             <option value="user">Usuario</option>
                             <option value="editor">Editor</option>
@@ -460,7 +517,7 @@ const PageGestionUsuarios = () => {
                         </div>
                         
                         <div>
-                          <label htmlFor="status" className="block text-sm font-medium text-gray-700">
+                          <label htmlFor="status" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                             Estado
                           </label>
                           <select
@@ -468,7 +525,11 @@ const PageGestionUsuarios = () => {
                             name="status"
                             value={formData.status}
                             onChange={handleInputChange}
-                            className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 sm:text-sm"
+                            className={`mt-1 block w-full py-2 px-3 border rounded-md shadow-sm sm:text-sm ${
+                              darkMode 
+                                ? 'bg-gray-700 border-gray-600 text-white focus:ring-cyan-500 focus:border-cyan-500' 
+                                : 'border-gray-300 bg-white focus:ring-cyan-500 focus:border-cyan-500'
+                            }`}
                           >
                             <option value="active">Activo</option>
                             <option value="inactive">Inactivo</option>
@@ -482,7 +543,7 @@ const PageGestionUsuarios = () => {
               </div>
               
               {/* Botones del modal */}
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse`}>
                 {modalMode === 'delete' ? (
                   <>
                     <button
@@ -495,7 +556,11 @@ const PageGestionUsuarios = () => {
                     <button
                       type="button"
                       onClick={handleCloseModal}
-                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                      className={`mt-3 w-full inline-flex justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm ${
+                        darkMode 
+                          ? 'border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700' 
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500`}
                     >
                       Cancelar
                     </button>
@@ -512,7 +577,11 @@ const PageGestionUsuarios = () => {
                     <button
                       type="button"
                       onClick={handleCloseModal}
-                      className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                      className={`mt-3 w-full inline-flex justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm ${
+                        darkMode 
+                          ? 'border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700' 
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500`}
                     >
                       Cancelar
                     </button>

@@ -80,7 +80,7 @@ export default function DashboardLayout({ children }) {
           {/* Main content - children are injected here */}
           <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
             <div className="">
-              <div className="max-w-7xl">
+              <div className="">
                 {children}
               </div>
             </div>
