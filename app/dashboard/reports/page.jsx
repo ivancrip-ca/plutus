@@ -20,7 +20,8 @@ import {
   MdTimeline,
   MdInsertDriveFile,
   MdRefresh,
-  MdShare
+  MdShare,
+  MdPrint
 } from 'react-icons/md';
 import { format, subMonths, subYears, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -560,6 +561,439 @@ const ReportsPage = () => {
     setMounted(true);
   }, []);
 
+  // Función para imprimir el informe actual con formato similar a PDF
+  const handlePrint = () => {
+    // Ocultar el menú desplegable
+    setShowExportOptions(false);
+    
+    // Crear un estilo para la impresión con diseño similar a PDF
+    const printStyles = `
+      @media print {
+        @page {
+          size: A4;
+          margin: 20mm 15mm;
+        }
+        
+        body {
+          font-family: 'Helvetica', 'Arial', sans-serif;
+          line-height: 1.5;
+          color: #333;
+          background: #fff;
+        }
+        
+        .print-container {
+          max-width: 100%;
+        }
+        
+        .print-header {
+          text-align: center;
+          margin-bottom: 25px;
+          padding-bottom: 15px;
+          border-bottom: 1px solid #ddd;
+        }
+        
+        .print-header h1 {
+          font-size: 24px;
+          font-weight: bold;
+          margin: 0 0 5px 0;
+          color: #2563eb;
+        }
+        
+        .print-header p {
+          margin: 5px 0;
+          font-size: 12px;
+          color: #555;
+        }
+        
+        .print-logo {
+          text-align: center;
+          margin-bottom: 15px;
+        }
+        
+        .print-logo img {
+          height: 50px;
+        }
+        
+        .print-meta {
+          margin: 20px 0;
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          color: #555;
+        }
+        
+        .print-summary {
+          margin: 20px 0;
+          padding: 15px;
+          background-color: #f7f9fc;
+          border-radius: 5px;
+        }
+        
+        .print-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 15px;
+        }
+        
+        .print-summary-item {
+          border-bottom: 1px solid #eee;
+          padding-bottom: 10px;
+        }
+        
+        .print-summary-label {
+          font-size: 12px;
+          color: #555;
+          margin-bottom: 5px;
+        }
+        
+        .print-summary-value {
+          font-size: 16px;
+          font-weight: bold;
+          color: #333;
+        }
+        
+        .print-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+          font-size: 12px;
+        }
+        
+        .print-table th {
+          background-color: #f1f5f9;
+          color: #334155;
+          font-weight: bold;
+          text-align: left;
+          padding: 10px;
+          border: 1px solid #e2e8f0;
+        }
+        
+        .print-table td {
+          padding: 10px;
+          border: 1px solid #e2e8f0;
+          vertical-align: top;
+        }
+        
+        .print-table tr:nth-child(even) {
+          background-color: #f8fafc;
+        }
+        
+        .print-table tr:hover {
+          background-color: #f1f5f9;
+        }
+        
+        .print-footer {
+          margin-top: 30px;
+          text-align: center;
+          font-size: 10px;
+          color: #6b7280;
+          border-top: 1px solid #ddd;
+          padding-top: 15px;
+        }
+        
+        .amount-positive {
+          color: #059669;
+        }
+        
+        .amount-negative {
+          color: #dc2626;
+        }
+        
+        .print-chart {
+          margin: 20px 0;
+          text-align: center;
+          padding: 20px;
+          background-color: #f9fafb;
+          border-radius: 5px;
+          border: 1px dashed #d1d5db;
+        }
+        
+        .no-print {
+          display: none;
+        }
+      }
+    `;
+    
+    // Obtener datos del informe actual
+    let reportTitle = '';
+    let reportData = [];
+    
+    // Determinar el título y los datos según el tipo de informe
+    switch(reportType) {
+      case 'summary':
+        reportTitle = 'Resumen General';
+        break;
+      case 'income-expense':
+        reportTitle = 'Ingresos vs Gastos';
+        const incomeExpenseData = document.querySelectorAll('[class*="rounded-lg bg-gray"] table tbody tr');
+        incomeExpenseData.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length > 0) {
+            reportData.push({
+              month: cells[0]?.textContent || '',
+              income: cells[1]?.textContent || '',
+              expenses: cells[2]?.textContent || '',
+              balance: cells[3]?.textContent || ''
+            });
+          }
+        });
+        break;
+      case 'categories':
+        reportTitle = 'Gastos por Categoría';
+        const categoriesData = document.querySelectorAll('[class*="rounded-lg bg-gray"] table tbody tr');
+        categoriesData.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length > 0) {
+            reportData.push({
+              category: cells[0]?.textContent || '',
+              amount: cells[1]?.textContent || '',
+              percentage: cells[2]?.textContent || ''
+            });
+          }
+        });
+        break;
+      case 'trends':
+        reportTitle = 'Tendencias';
+        const trendsData = document.querySelectorAll('[class*="rounded-lg bg-gray"] table tbody tr');
+        trendsData.forEach(row => {
+          const cells = row.querySelectorAll('td');
+          if (cells.length > 0) {
+            reportData.push({
+              month: cells[0]?.textContent || '',
+              savings: cells[1]?.textContent || '',
+              netWorth: cells[2]?.textContent || '',
+              change: cells[3]?.textContent || ''
+            });
+          }
+        });
+        break;
+      case 'monthly':
+        reportTitle = 'Informe Mensual';
+        break;
+      case 'annual':
+        reportTitle = 'Informe Anual';
+        break;
+      default:
+        reportTitle = 'Informe';
+    }
+    
+    // Formatear la fecha actual
+    const currentDate = new Date();
+    const formattedDate = currentDate.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+    
+    // Crear el contenido HTML para la impresión con aspecto similar a PDF
+    let printContent = `
+      <html>
+        <head>
+          <title>${reportTitle} - Plutus</title>
+          <style>${printStyles}</style>
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="print-logo">
+              <span style="font-size: 28px; font-weight: bold; color: #0891b2;">Plutus</span>
+              <span style="font-size: 28px; color: #64748b;"> | Finanzas</span>
+            </div>
+            
+            <div class="print-header">
+              <h1>${reportTitle}</h1>
+              <p>Período: ${getTimeRangeText()}</p>
+            </div>
+            
+            <div class="print-meta">
+              <div>
+                <strong>Fecha de generación:</strong> ${formattedDate}
+              </div>
+              <div>
+                <strong>Ref:</strong> REP-${Math.floor(Math.random()*10000).toString().padStart(4, '0')}
+              </div>
+            </div>
+    `;
+    
+    // Añadir resumen si es el tipo de informe "summary"
+    if (reportType === 'summary') {
+      // Obtener datos del resumen general (asumiendo que existen en la página)
+      const summaryData = {
+        income: document.querySelector('[class*="rounded-lg"] p:contains("Ingresos")').nextElementSibling?.textContent || '$8,500.35',
+        expenses: document.querySelector('[class*="rounded-lg"] p:contains("Gastos")').nextElementSibling?.textContent || '$5,320.50',
+        savings: document.querySelector('[class*="rounded-lg"] p:contains("Ahorros")').nextElementSibling?.textContent || '$3,179.85',
+        balance: document.querySelector('[class*="rounded-lg"] p:contains("Balance")').nextElementSibling?.textContent || '$12,750.22'
+      };
+      
+      printContent += `
+        <div class="print-summary">
+          <h2 style="margin-top: 0; font-size: 16px; color: #334155;">Resumen Financiero</h2>
+          <div class="print-summary-grid">
+            <div class="print-summary-item">
+              <div class="print-summary-label">Ingresos Totales</div>
+              <div class="print-summary-value amount-positive">${summaryData.income}</div>
+            </div>
+            <div class="print-summary-item">
+              <div class="print-summary-label">Gastos Totales</div>
+              <div class="print-summary-value amount-negative">${summaryData.expenses}</div>
+            </div>
+            <div class="print-summary-item">
+              <div class="print-summary-label">Ahorros</div>
+              <div class="print-summary-value">${summaryData.savings}</div>
+            </div>
+            <div class="print-summary-item">
+              <div class="print-summary-label">Balance General</div>
+              <div class="print-summary-value">${summaryData.balance}</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="print-chart">
+          <p style="font-size: 14px; margin-bottom: 5px; color: #334155;">Visualización Gráfica</p>
+          <p style="font-size: 12px; color: #6b7280;">Este informe incluye una visualización gráfica en la aplicación Plutus</p>
+        </div>
+      `;
+    }
+    
+    // Añadir tabla según el tipo de informe
+    if (reportData.length > 0) {
+      printContent += `
+        <h2 style="font-size: 16px; color: #334155; margin-bottom: 15px; padding-bottom: 5px; border-bottom: 1px solid #e2e8f0;">Detalle del Informe</h2>
+        <table class="print-table">
+          <thead>
+            <tr>
+      `;
+      
+      // Determinar las columnas según el tipo de informe
+      if (reportType === 'income-expense') {
+        printContent += `
+              <th>Mes</th>
+              <th>Ingresos</th>
+              <th>Gastos</th>
+              <th>Balance</th>
+        `;
+      } else if (reportType === 'categories') {
+        printContent += `
+              <th>Categoría</th>
+              <th>Monto</th>
+              <th>Porcentaje</th>
+        `;
+      } else if (reportType === 'trends') {
+        printContent += `
+              <th>Mes</th>
+              <th>Ahorros</th>
+              <th>Patrimonio Neto</th>
+              <th>Cambio</th>
+        `;
+      }
+      
+      printContent += `
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      
+      // Agregar filas según el tipo de informe
+      if (reportType === 'income-expense') {
+        reportData.forEach(data => {
+          printContent += `
+            <tr>
+              <td>${data.month}</td>
+              <td class="amount-positive">${data.income}</td>
+              <td class="amount-negative">${data.expenses}</td>
+              <td>${data.balance}</td>
+            </tr>
+          `;
+        });
+      } else if (reportType === 'categories') {
+        reportData.forEach(data => {
+          printContent += `
+            <tr>
+              <td>${data.category}</td>
+              <td>${data.amount}</td>
+              <td>${data.percentage}</td>
+            </tr>
+          `;
+        });
+      } else if (reportType === 'trends') {
+        reportData.forEach(data => {
+          // Determinar si el cambio es positivo (para aplicar color)
+          const isPositiveChange = data.change && !data.change.includes('-');
+          printContent += `
+            <tr>
+              <td>${data.month}</td>
+              <td>${data.savings}</td>
+              <td>${data.netWorth}</td>
+              <td class="${isPositiveChange ? 'amount-positive' : 'amount-negative'}">${data.change}</td>
+            </tr>
+          `;
+        });
+      }
+      
+      printContent += `
+          </tbody>
+        </table>
+      `;
+      
+      // Añadir una nota sobre la visualización de datos si corresponde
+      if (reportType === 'categories' || reportType === 'income-expense' || reportType === 'trends') {
+        printContent += `
+          <div class="print-chart">
+            <p style="font-size: 14px; margin-bottom: 5px; color: #334155;">Visualización Gráfica</p>
+            <p style="font-size: 12px; color: #6b7280;">Este informe incluye gráficos interactivos en la aplicación Plutus</p>
+          </div>
+        `;
+      }
+    } else {
+      // Si no hay datos tabulares
+      printContent += `
+        <div style="padding: 30px; text-align: center; background-color: #f9fafb; border-radius: 5px; margin: 20px 0;">
+          <p style="font-size: 16px; color: #4b5563; margin-bottom: 10px;">Este informe ofrece una visualización detallada de tus datos financieros</p>
+          <p style="font-size: 14px; color: #6b7280;">Para interactuar con todos los componentes del informe, consulta la aplicación Plutus</p>
+        </div>
+      `;
+    }
+    
+    // Añadir notas y recomendaciones
+    printContent += `
+      <div style="margin-top: 30px; padding: 15px; background-color: #f0f9ff; border-radius: 5px; border-left: 4px solid #0ea5e9;">
+        <h3 style="margin-top: 0; font-size: 14px; color: #0c4a6e;">Notas y Recomendaciones</h3>
+        <ul style="margin: 10px 0; padding-left: 20px; font-size: 12px; color: #334155;">
+          <li>Este informe ha sido generado automáticamente por Plutus.</li>
+          <li>Los datos presentados corresponden al período: ${getTimeRangeText()}.</li>
+          <li>Para un análisis más detallado, consulta la aplicación web de Plutus.</li>
+        </ul>
+      </div>
+    `;
+    
+    // Añadir pie de página
+    printContent += `
+      <div class="print-footer">
+        <p>Generado por Plutus | Gestión de Finanzas Personales | ${formattedDate}</p>
+        <p>© ${currentDate.getFullYear()} Plutus. Todos los derechos reservados.</p>
+      </div>
+    `;
+    
+    // Cerrar el HTML
+    printContent += `
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Crear una ventana para imprimir
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // Esperar a que el contenido se cargue antes de imprimir
+    printWindow.onload = function() {
+      printWindow.print();
+      printWindow.onafterprint = function() {
+        printWindow.close();
+      };
+    };
+  };
+
   // Mostrar indicador de carga durante la hidratación
   if (!mounted) {
     return (
@@ -601,17 +1035,24 @@ const ReportsPage = () => {
                 <div className="py-1">
                   <button className={`block w-full text-left px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
                     <div className="flex items-center">
-                      <MdPictureAsPdf className="mr-2" /> Exportar como PDF
+                      <MdPictureAsPdf className="mr-2 h-5 w-5" /> Exportar como PDF
                     </div>
                   </button>
                   <button className={`block w-full text-left px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
                     <div className="flex items-center">
-                      <MdFileDownload className="mr-2" /> Exportar como Excel
+                      <MdFileDownload className="mr-2 h-5 w-5" /> Exportar como Excel
+                    </div>
+                  </button>
+                  <button 
+                    onClick={handlePrint}
+                    className={`block w-full text-left px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
+                    <div className="flex items-center">
+                      <MdPrint className="mr-2 h-5 w-5" /> Imprimir
                     </div>
                   </button>
                   <button className={`block w-full text-left px-4 py-2 text-sm ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`}>
                     <div className="flex items-center">
-                      <MdShare className="mr-2" /> Compartir Informe
+                      <MdShare className="mr-2 h-5 w-5" /> Compartir Informe
                     </div>
                   </button>
                 </div>
