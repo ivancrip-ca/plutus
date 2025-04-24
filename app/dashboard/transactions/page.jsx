@@ -1533,47 +1533,47 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Encabezado */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Transacciones</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Gestiona y visualiza tus movimientos financieros
-          </p>
-        </div>  
-        <div className="mt-4 md:mt-0 flex space-x-2">
-          <button 
-            className={`cursor-pointer ${darkMode ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'} px-4 py-2 rounded-lg border flex items-center gap-1`}
-            onClick={() => setIsModalOpen(true)}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Nueva transacción
-          </button>
-          <div className="relative" ref={optionsMenuRef}>
+      
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+          <div>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Transacciones</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Gestiona y visualiza tus movimientos financieros
+            </p>
+          </div>  
+          <div className="mt-4 md:mt-0 flex space-x-2">
             <button 
-              className={`p-3 cursor-pointer text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors`}
-              onClick={() => setOpenOptionsMenu(!openOptionsMenu)}
+          className={`cursor-pointer ${darkMode ? 'bg-gray-800 text-white border-gray-700 hover:bg-gray-700' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'} px-4 py-2 rounded-lg border flex items-center gap-1`}
+          onClick={() => setIsModalOpen(true)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-              </svg>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Nueva transacción
             </button>
-            
-            {openOptionsMenu && (
-              <div 
-                className={`absolute right-0 z-10 mt-2 w-48 rounded-md shadow-lg ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'} border`}
-                style={{ 
-                  animation: 'dropdown-in 0.3s ease-out forwards',
-                  top: '100%',
-                  right: 0
-                }}
-              >
-                <div className="py-1">
-                  <button 
-                    className={`cursor-pointer block w-full text-left px-4 py-2 text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}
-                    onClick={() => {
+            <div className="relative" ref={optionsMenuRef}>
+          <button 
+            className={`p-3 cursor-pointer ${darkMode ? 'text-gray-300 bg-gray-800 hover:bg-gray-700' : 'text-gray-600 bg-gray-200 hover:bg-gray-300'} rounded-lg transition-colors`}
+            onClick={() => setOpenOptionsMenu(!openOptionsMenu)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+          </button>
+          
+          {openOptionsMenu && (
+            <div 
+              className={`absolute right-0 z-10 mt-2 w-48 rounded-md shadow-lg ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'} border`}
+              style={{ 
+            animation: 'dropdown-in 0.3s ease-out forwards',
+            top: '100%',
+            right: 0
+              }}
+            >
+              <div className="py-1">
+            <button 
+              className={`cursor-pointer block w-full text-left px-4 py-2 text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-700 hover:bg-gray-100'} transition-colors`}
+              onClick={() => {
                       setOpenOptionsMenu(false);
                       exportTransactionsToCSV();
                     }}
@@ -1687,46 +1687,48 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Filtros y búsqueda */}
-      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 items-center mb-6">
-        <div className="flex space-x-2">
-          <FilterButton 
-            active={filter === 'all'} 
-            onClick={() => setFilter('all')}
-          >
-            Todas
-          </FilterButton>
-          <FilterButton 
-            active={filter === 'ingresos'} 
-            onClick={() => setFilter('ingresos')}
-          >
-            Ingresos
-          </FilterButton>
-          <FilterButton 
-            active={filter === 'gastos'} 
-            onClick={() => setFilter('gastos')}
-          >
-            Gastos
-          </FilterButton>
-        </div>
+   
+        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 items-center mb-6">
+          <div className="flex space-x-2">
+            <FilterButton 
+          active={filter === 'all'} 
+          onClick={() => setFilter('all')}
+            >
+          Todas
+            </FilterButton>
+            <FilterButton 
+          active={filter === 'ingresos'} 
+          onClick={() => setFilter('ingresos')}
+            >
+          Ingresos
+            </FilterButton>
+            <FilterButton 
+          active={filter === 'gastos'} 
+          onClick={() => setFilter('gastos')}
+            >
+          Gastos
+            </FilterButton>
+          </div>
 
-        <div className="relative w-full md:w-64 ml-auto">
-          <input
-            type="text"
-            placeholder="Buscar transacciones..."
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-            </svg>
+          <div className="relative w-full md:w-64 ml-auto">
+            <input
+          type="text"
+          placeholder="Buscar transacciones..."
+          className={`w-full pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            darkMode ? 'bg-gray-800 text-white border-0' : 'border border-gray-300'
+          }`}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+          </svg>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Lista de transacciones */}
+        {/* Lista de transacciones */}
       <div id="transaction-container" className={`z-10 rounded-xl shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} overflow-visible mb-6`}>
         <div className="p-6">
           <h2 className={`text-xl font-semibold ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Historial de transacciones</h2>
