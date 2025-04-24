@@ -35,6 +35,12 @@ const PageAccounts = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [openAccountMenu, setOpenAccountMenu] = useState(null);
   const [closingAccountMenu, setClosingAccountMenu] = useState(null);
+  const [userTransactions, setUserTransactions] = useState([]);
+  const [totalIngresos, setTotalIngresos] = useState(0);
+  const [totalGastos, setTotalGastos] = useState(0);
+  const [efectivoTransactions, setEfectivoTransactions] = useState([]);
+  const [saldoEfectivo, setSaldoEfectivo] = useState(0);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // Modal de confirmación para eliminar cuenta
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -59,7 +65,91 @@ const PageAccounts = () => {
 
   // Referencia para el contenido del modal
   const modalContentRef = useRef(null);
+
+  // Estado para el modal de edición de saldo inicial de efectivo
+  const [isEfectivoModalOpen, setIsEfectivoModalOpen] = useState(false);
+  const [saldoInicialEfectivo, setSaldoInicialEfectivo] = useState('0');
+  const [updateEfectivoLoading, setUpdateEfectivoLoading] = useState(false);
+  const [efectivoError, setEfectivoError] = useState('');
+  const [efectivoSuccess, setEfectivoSuccess] = useState('');
   
+  // Función para manejar el cambio en el input del saldo inicial de efectivo
+  const handleEfectivoInputChange = (e) => {
+    const value = e.target.value;
+    // Eliminar cualquier caracter que no sea número o punto decimal
+    const numericValue = value.replace(/[^\d.]/g, '');
+    setSaldoInicialEfectivo(numericValue);
+  };
+  
+  // Función para guardar el saldo inicial de efectivo
+  const handleSaveEfectivoSaldoInicial = async (e) => {
+    e.preventDefault();
+    setEfectivoError('');
+    setEfectivoSuccess('');
+    setUpdateEfectivoLoading(true);
+    
+    try {
+      if (!currentUser) {
+        throw new Error('Debes iniciar sesión para realizar esta acción');
+      }
+      
+      if (!saldoInicialEfectivo.trim() || isNaN(Number(saldoInicialEfectivo))) {
+        throw new Error('El saldo inicial debe ser un número válido');
+      }
+      
+      // Importar las funciones necesarias de Firestore
+      const { doc, setDoc, collection, getDocs, query, where, serverTimestamp, deleteDoc } = await import('firebase/firestore');
+      
+      // Primero comprobar si ya existe una transacción de saldo inicial
+      const saldoInicialQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', currentUser.uid),
+        where('cuenta', '==', 'Efectivo'),
+        where('esSaldoInicial', '==', true)
+      );
+      
+      const querySnapshot = await getDocs(saldoInicialQuery);
+      
+      // Si hay transacciones existentes con esSaldoInicial=true, eliminarlas
+      const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      // Crear la nueva transacción de saldo inicial
+      const saldoInicialData = {
+        userId: currentUser.uid,
+        descripcion: 'Saldo inicial de efectivo',
+        monto: Number(saldoInicialEfectivo),
+        tipo: 'ingreso',
+        categoria: 'Saldo Inicial',
+        cuenta: 'Efectivo',
+        fecha: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+        esSaldoInicial: true
+      };
+      
+      // Guardar en Firestore
+      const docRef = await addDoc(collection(db, 'transactions'), saldoInicialData);
+      
+      console.log('Saldo inicial guardado con ID:', docRef.id);
+      setEfectivoSuccess('Saldo inicial guardado correctamente');
+      
+      // Actualizar lista de transacciones
+      await fetchUserTransactions();
+      
+      // Cerrar modal después de un breve momento
+      setTimeout(() => {
+        setIsEfectivoModalOpen(false);
+        setEfectivoSuccess('');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error al guardar saldo inicial:', error);
+      setEfectivoError(error.message || 'Error al guardar el saldo inicial');
+    } finally {
+      setUpdateEfectivoLoading(false);
+    }
+  };
+
   // Agregar efecto para manejar clics fuera del menú
   useEffect(() => {
     function handleClickOutside(event) {
@@ -128,6 +218,7 @@ const PageAccounts = () => {
     setMounted(true);
     if (currentUser) {
       fetchUserAccounts();
+      fetchUserTransactions();
     }
   }, [currentUser]);
   
@@ -175,6 +266,59 @@ const PageAccounts = () => {
       console.error('Error al obtener las cuentas del usuario:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Función para obtener todas las transacciones del usuario
+  const fetchUserTransactions = async () => {
+    try {
+      if (!currentUser) return;
+      
+      const transactionsQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', currentUser.uid)
+      );
+      
+      const querySnapshot = await getDocs(transactionsQuery);
+      const transactionsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setUserTransactions(transactionsData);
+      
+      // Calcular totales
+      const ingresos = transactionsData
+        .filter(t => t.tipo === 'ingreso')
+        .reduce((sum, t) => sum + (Number(t.monto) || 0), 0);
+      
+      const gastos = transactionsData
+        .filter(t => t.tipo === 'gasto')
+        .reduce((sum, t) => sum + (Number(t.monto) || 0), 0);
+      
+      setTotalIngresos(ingresos);
+      setTotalGastos(gastos);
+      
+      // Filtrar transacciones de efectivo
+      const efectivoData = transactionsData.filter(t => 
+        t.cuenta && t.cuenta.toLowerCase() === 'efectivo'
+      );
+      
+      setEfectivoTransactions(efectivoData);
+      
+      // Calcular saldo de efectivo
+      const ingresosEfectivo = efectivoData
+        .filter(t => t.tipo === 'ingreso')
+        .reduce((sum, t) => sum + (Number(t.monto) || 0), 0);
+      
+      const gastosEfectivo = efectivoData
+        .filter(t => t.tipo === 'gasto')
+        .reduce((sum, t) => sum + (Number(t.monto) || 0), 0);
+      
+      setSaldoEfectivo(ingresosEfectivo - gastosEfectivo);
+      
+    } catch (error) {
+      console.error('Error al obtener las transacciones del usuario:', error);
     }
   };
   
@@ -609,20 +753,20 @@ const PageAccounts = () => {
                 <div className="text-sm opacity-75">Ingresos</div>
                 <div className="text-xl font-semibold flex items-center gap-1">
                   <ArrowDownRight className="h-4 w-4 text-green-300" />
-                  <span>$0.00</span>
+                  <span>${totalIngresos.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                 </div>
                 <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>
-                  Registra tus ingresos
+                  Total de ingresos registrados
                 </p>
               </div>
               <div className={`bg-white bg-opacity-10 p-3 rounded-xl ${darkMode ? 'bg-gradient-to-r from-gray-900 to-gray-800' : 'bg-white bg-opacity-20 text-gray-700'}`}>
                 <div className="text-sm opacity-75">Gastos</div>
                 <div className="text-xl font-semibold flex items-center gap-1">
                   <ArrowUpRight className="h-4 w-4 text-red-300" />
-                  <span>$0.00</span>
+                  <span>${totalGastos.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                 </div>
                 <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>
-                  Registra tus gastos
+                  Total de gastos registrados
                 </p>
               </div>
             </>
@@ -661,8 +805,64 @@ const PageAccounts = () => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Cuenta de Efectivo (siempre presente) */}
+          <div className={`p-6 rounded-xl shadow-sm transition-all duration-300 ${
+            darkMode ? 'bg-gray-800 border border-gray-700 hover:border-gray-500' : 'bg-white border border-gray-100 hover:border-gray-300'
+          }`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center mb-3">
+                  <div className={`p-2 rounded-full mr-3 ${darkMode ? 'bg-green-900/30' : 'bg-green-100'}`}>
+                    <FaMoneyBillWave className="h-6 w-6 text-green-500" />
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Efectivo</h3>
+                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Cuenta predeterminada
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Saldo de efectivo y mensaje */}
+                {efectivoTransactions.length > 0 ? (
+                  <>
+                    <div className={`mt-4 text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                      ${saldoEfectivo.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    </div>
+                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      {efectivoTransactions.length} transacciones registradas
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-4 text-sm p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    No has registrado transacciones en efectivo aún. 
+                    <br/>
+                    <Link href="/dashboard/transactions" className="font-medium mt-1 inline-block text-blue-600 dark:text-blue-400 hover:underline">
+                      Registra tu primera transacción →
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Botones de acción */}
+            <div className="mt-6 flex justify-between items-center">
+              <button 
+                onClick={() => setIsEfectivoModalOpen(true)}
+                className={`px-3 py-1.5 text-xs font-medium rounded ${
+                  darkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Ver detalles
+              </button>
+    
+            </div>
+          </div>
+          
           {/* Mostrar solo las últimas 6 cuentas registradas */}
-          {accounts.slice(0, 6).map((account) => (
+          {accounts.slice(0, 5).map((account) => (
             <div 
               key={account.id} 
               onClick={() => setSelectedAccount(account)}
@@ -729,28 +929,30 @@ const PageAccounts = () => {
           ))}
           
           {/* Add Account Card */}
-          <div 
-            onClick={() => {
-              setIsAddAccountOpen(true);
-              setError('');
-              setSuccessMessage('');
-              // Resetear el formulario al abrir el modal
-              setFormData({
-                bankName: '',
-                lastDigits: '',
-                initialBalance: '',
-                accountType: 'debit',
-                color: ''
-              });
-            }}
-            className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'} rounded-xl border border-dashed p-4 cursor-pointer transition-colors flex flex-col items-center justify-center min-h-[160px]`}
-          >
-            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
-              <Plus className="h-6 w-6 text-blue-500" />
+          {accounts.length < 5 && (
+            <div 
+              onClick={() => {
+                setIsAddAccountOpen(true);
+                setError('');
+                setSuccessMessage('');
+                // Resetear el formulario al abrir el modal
+                setFormData({
+                  bankName: '',
+                  lastDigits: '',
+                  initialBalance: '',
+                  accountType: 'debit',
+                  color: ''
+                });
+              }}
+              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'} rounded-xl border border-dashed p-4 cursor-pointer transition-colors flex flex-col items-center justify-center min-h-[160px]`}
+            >
+              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                <Plus className="h-6 w-6 text-blue-500" />
+              </div>
+              <h3 className={`font-medium cursor-pointer ${darkMode ? 'text-white' : 'text-gray-900'}`}>Agregar cuenta</h3>
+              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center mt-1`}>Conectar banco o tarjeta</p>
             </div>
-            <h3 className={`font-medium cursor-pointer ${darkMode ? 'text-white' : 'text-gray-900'}`}>Agregar cuenta</h3>
-            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center mt-1`}>Conectar banco o tarjeta</p>
-          </div>
+          )}
         </div>
       </div>
       
@@ -758,28 +960,70 @@ const PageAccounts = () => {
       <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} rounded-xl shadow-sm border mb-8`}>
         <div className={`p-4 ${darkMode ? 'border-gray-700' : 'border-gray-100'} border-b flex justify-between items-center`}>
           <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Transacciones Recientes</h2>
-          <button className="text-blue-500 hover:text-blue-700 text-sm font-medium flex items-center cursor-pointer">
+          <Link href="/dashboard/transactions" className="text-blue-500 hover:text-blue-700 text-sm font-medium flex items-center cursor-pointer">
             Ver todas <ChevronRight className="h-4 w-4" />
-          </button>
+          </Link>
         </div>
         
         <div className="overflow-x-auto">
-          {userAccounts.length > 0 ? (
+          {userTransactions.length > 0 ? (
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+              {userTransactions
+                .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+                .slice(0, 5)
+                .map((transaction) => (
+                  <div key={transaction.id} className={`p-4 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} flex items-center justify-between transition-colors`}>
+                    <div className="flex items-center">
+                      <div className={`inline-flex items-center justify-center h-10 w-10 rounded-full mb-0 mr-3 flex-shrink-0 ${
+                        transaction.tipo === 'ingreso' 
+                          ? darkMode ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-600' 
+                          : darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {transaction.tipo === 'ingreso' ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{transaction.descripcion}</h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center">
+                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{transaction.categoria || 'Sin categoría'}</p>
+                          <span className={`hidden sm:inline mx-2 ${darkMode ? 'text-gray-600' : 'text-gray-300'}`}>•</span>
+                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {new Date(transaction.fecha).toLocaleDateString('es-ES', { 
+                              day: '2-digit', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-medium ${
+                        transaction.tipo === 'ingreso' 
+                          ? darkMode ? 'text-green-400' : 'text-green-600' 
+                          : darkMode ? 'text-red-400' : 'text-red-600'
+                      }`}>${transaction.monto.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {transaction.cuenta}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ) : (
             <div className="flex flex-col items-center justify-center py-10">
               <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
                 <RefreshCcw className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
               </div>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
                 Aún no hay transacciones para mostrar. Las transacciones aparecerán aquí cuando realices movimientos en tus cuentas.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-10">
-              <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
-                <CreditCard className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-              </div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
-                Agrega una cuenta para empezar a registrar tus transacciones.
               </p>
             </div>
           )}
@@ -1155,6 +1399,120 @@ const PageAccounts = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de edición de saldo inicial de efectivo */}
+      {isEfectivoModalOpen && (
+        <div 
+          className={`fixed inset-0 flex items-center justify-center z-[100] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
+          onClick={(e) => {
+            // Cerrar el modal al hacer clic fuera de su contenido
+            if (e.target === e.currentTarget) {
+              setIsEfectivoModalOpen(false);
+              setEfectivoError('');
+              setEfectivoSuccess('');
+            }
+          }}
+        >
+          <div 
+            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6`}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                Efectivo - Configuración
+              </h2>
+              <button 
+                onClick={() => {
+                  setIsEfectivoModalOpen(false);
+                  setEfectivoError('');
+                  setEfectivoSuccess('');
+                }} 
+                className={`cursor-pointer ${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveEfectivoSaldoInicial}>
+              {efectivoError && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg">
+                  {efectivoError}
+                </div>
+              )}
+              
+              {efectivoSuccess && (
+                <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg">
+                  {efectivoSuccess}
+                </div>
+              )}
+              
+              <div className="space-y-4 mb-6">
+                <div className="px-4 py-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-sm mb-4">
+                  Esta opción te permite establecer un saldo inicial para tu cuenta de efectivo.
+                  Los cambios que realices aquí afectarán todas tus transacciones de efectivo.
+                </div>
+                
+                <div>
+                  <label htmlFor="saldoInicialEfectivo" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Saldo Inicial
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                    </div>
+                    <input
+                      type="text"
+                      id="saldoInicialEfectivo"
+                      name="saldoInicialEfectivo"
+                      value={saldoInicialEfectivo}
+                      onChange={handleEfectivoInputChange}
+                      placeholder="0.00"
+                      className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      required
+                    />
+                  </div>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Ingresa el monto que tienes actualmente en efectivo.
+                  </p>
+                </div>
+                
+                <div className="px-4 py-3 rounded-lg bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 text-sm">
+                  <p className="font-medium mb-1">Información importante</p>
+                  <p>Este valor se registrará como una transacción de tipo "Ingreso" con la categoría "Saldo Inicial" en tu cuenta de efectivo.</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsEfectivoModalOpen(false);
+                    setEfectivoError('');
+                    setEfectivoSuccess('');
+                  }}
+                  className={`px-4 py-2 cursor-pointer ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={updateEfectivoLoading}
+                  className={`px-4 py-2 cursor-pointer bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center ${updateEfectivoLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {updateEfectivoLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Guardando...
+                    </>
+                  ) : "Guardar" }
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

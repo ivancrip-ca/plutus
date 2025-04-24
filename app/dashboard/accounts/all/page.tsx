@@ -153,7 +153,7 @@ const AllAccountsPage = () => {
     setIsAddAccountOpen(true);
     handleCloseAccountMenu(); // Cerrar el menú desplegable
   };
-  
+
   // Función para eliminar una cuenta
   const handleDeleteAccount = async () => {
     if (!accountToDelete || !currentUser) return;
@@ -251,6 +251,8 @@ const AllAccountsPage = () => {
         return <FaMoneyBillWave className="text-white text-lg" />;
       case "credit":
         return <FaCreditCard className="text-white text-lg" />;
+      case "efectivo":
+        return <FaMoneyBillWave className="text-white text-lg" />;
       default:
         return <BsBank2 className="text-white text-lg" />;
     }
@@ -416,8 +418,75 @@ const AllAccountsPage = () => {
                   <div className={`text-xl font-bold ${account.balance < 0 ? 'text-red-600' : darkMode ? 'text-white' : 'text-gray-900'}`}>
                     ${Math.abs(account.balance).toLocaleString('en-US', {minimumFractionDigits: 2})}
                   </div>
-                  <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
-                    {account.type === 'credit' ? `Límite: $${account.limit?.toLocaleString('en-US') || '0.00'}` : 'Disponible'}
+                  <div className="flex justify-between items-center">
+                    <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+                      {account.type === 'credit' ? `Límite: $${account.limit?.toLocaleString('en-US') || '0.00'}` : 'Disponible'}
+                    </div>
+                    
+                    {/* Botón para establecer saldo inicial de efectivo */}
+                    {account.type === 'efectivo' && (
+                      <div className="mt-2 w-full">
+                        <label htmlFor={`balance-${account.id}`} className={`block text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                          Actualizar saldo inicial:
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                              <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-xs`}>$</span>
+                            </div>
+                            <input
+                              type="number"
+                              id={`balance-${account.id}`}
+                              defaultValue={account.balance}
+                              className={`w-full pl-5 pr-2 py-1 text-sm rounded-md border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                            />
+                          </div>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              
+                              try {
+                                setLoading(true);
+                                setError('');
+                                
+                                // Obtener el valor actualizado del saldo
+                                const balanceInput = document.getElementById(`balance-${account.id}`) as HTMLInputElement;
+                                const newBalance = parseFloat(balanceInput.value);
+                                
+                                if (isNaN(newBalance)) {
+                                  setError('Por favor, ingresa un saldo válido');
+                                  setTimeout(() => setError(''), 3000);
+                                  return;
+                                }
+                                
+                                // Actualizar la cuenta en Firestore
+                                await updateDoc(doc(db, 'accounts', account.id), {
+                                  balance: newBalance,
+                                  updatedAt: new Date().toISOString()
+                                });
+                                
+                                // Refrescar la lista de cuentas
+                                await fetchUserAccounts();
+                                
+                                // Mostrar mensaje de éxito
+                                setSuccessMessage('Saldo de efectivo actualizado correctamente');
+                                setTimeout(() => setSuccessMessage(''), 3000);
+                              } catch (error) {
+                                console.error('Error al actualizar el saldo de efectivo:', error);
+                                setError('No se pudo actualizar el saldo. Inténtalo de nuevo.');
+                                setTimeout(() => setError(''), 3000);
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="px-2 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+                          >
+                            {loading ? 'Actualizando...' : 'Actualizar'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                   </div>
                 </div>
               </div>

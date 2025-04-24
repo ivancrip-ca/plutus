@@ -118,8 +118,7 @@ const TransactionItem = ({ transaccion, onEdit, onDelete, onDuplicate, selection
               className={`absolute z-20 mt-2 w-48 rounded-md shadow-lg ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'} border`}
               style={{ 
                 animation: 'dropdown-in 0.3s ease-out forwards',
-                top: 'auto',
-                bottom: window.innerHeight - document.getElementById('transaction-container')?.getBoundingClientRect().bottom + 10 < 180 ? '100%' : 'auto',
+                top: '100%',
                 right: 0
               }}
             >
@@ -175,7 +174,7 @@ const TransactionItem = ({ transaccion, onEdit, onDelete, onDuplicate, selection
       )}
     </div>
   );
-};
+}
 
 const FilterButton = ({ active, children, onClick }) => {
   const { darkMode } = useTheme();
@@ -544,7 +543,7 @@ const printTransactions = (filter, searchTerm, filteredTransactions, totalIngres
                     <td>${formatFecha(tx.fecha)}</td>
                     <td>${tx.descripcion}</td>
                     <td>${tx.categoria}</td>
-                    <td>${tx.cuenta}</td>
+                    <td>${tx.cuenta}${tx.institution ? ` - ${tx.institution}` : ''}</td>
                     <td class="transaction-${tx.tipo}">${tx.tipo === 'ingreso' ? '+' : '-'}$${formatMonto(tx.monto)}</td>
                   </tr>
                 `).join('')}
@@ -604,6 +603,269 @@ const printTransactions = (filter, searchTerm, filteredTransactions, totalIngres
   }
 };
 
+// Función para exportar transacciones a PDF con diseño profesional
+const exportTransactionsToPDF = () => {
+  try {
+    // Importar dinámicamente para evitar problemas con SSR
+    import('jspdf').then(({ default: jsPDF }) => {
+      import('jspdf-autotable').then(({ default: autoTable }) => {
+        // Filtrar las transacciones según los filtros actuales
+        const dataToExport = filteredTransactions;
+
+        if (dataToExport.length === 0) {
+          setSuccessMessage("No hay transacciones para exportar con los filtros actuales");
+          setTimeout(() => setSuccessMessage(""), 3000);
+          return;
+        }
+
+        // Crear un nuevo documento PDF
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        // Añadir encabezado con logo
+        const addHeader = () => {
+          // Dibujar un rectángulo de color para el encabezado
+          doc.setFillColor(darkMode ? 32 : 59, darkMode ? 44 : 130, darkMode ? 55 : 246);
+          doc.rect(0, 0, doc.internal.pageSize.width, 25, 'F');
+
+          // Añadir título del documento
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(22);
+          doc.setTextColor(255, 255, 255);
+          doc.text('Reporte de Transacciones', 14, 15);
+
+          // Añadir logo (representado como un círculo)
+          doc.setFillColor(255, 255, 255);
+          doc.circle(doc.internal.pageSize.width - 15, 12, 8, 'F');
+
+          // Dibujar un icono de moneda dentro del círculo
+          doc.setFillColor(darkMode ? 32 : 59, darkMode ? 44 : 130, darkMode ? 55 : 246);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(12);
+          doc.setTextColor(darkMode ? 32 : 59, darkMode ? 44 : 130, darkMode ? 55 : 246);
+          doc.text('P', doc.internal.pageSize.width - 15, 15, { align: 'center' });
+
+          // Resetear estilo de texto
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.setFont('helvetica', 'normal');
+        };
+
+        // Añadir pie de página con número de página
+        const addFooter = () => {
+          const pageCount = doc.internal.getNumberOfPages();
+          for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+
+            // Añadir línea divisoria
+            doc.setDrawColor(200, 200, 200);
+            doc.line(14, doc.internal.pageSize.height - 20, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 20);
+
+            // Añadir texto del pie de página
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generado el ${new Date().toLocaleDateString('es-ES', {
+              day: '2-digit',
+              month: 'long',
+              year: 'numeric'
+            })}`, 14, doc.internal.pageSize.height - 15);
+
+            // Añadir número de página
+            doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 15);
+          }
+        };
+
+        // Aplicar el encabezado
+        addHeader();
+
+        // Meta-información para el PDF
+        doc.setProperties({
+          title: 'Reporte de Transacciones',
+          subject: 'Historial de transacciones financieras',
+          author: 'Plutus',
+          keywords: 'finanzas, transacciones, reporte',
+          creator: 'Plutus App'
+        });
+
+        // Añadir fecha de generación y periodo
+        doc.setFontSize(10);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-ES', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}`, 14, 30);
+
+        // Añadir filtros aplicados
+        doc.text(`Filtro aplicado: ${filter === 'all' ? 'Todas las transacciones' : filter === 'ingresos' ? 'Solo ingresos' : 'Solo gastos'}`, 14, 35);
+        if (searchTerm) {
+          doc.text(`Término de búsqueda: "${searchTerm}"`, 14, 40);
+        }
+
+        // Añadir resumen financiero
+        doc.setFillColor(245, 245, 245);
+        doc.roundedRect(14, 45, doc.internal.pageSize.width - 28, 35, 3, 3, 'F');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(50, 50, 50);
+        doc.text('Resumen Financiero', 20, 55);
+
+        // Crear gráfico visual de la distribución
+        const barWidth = 120;
+        const barHeight = 8;
+        const barX = 20;
+        const barY = 70;
+
+        // Total para calcular porcentajes
+        const total = totalIngresos + totalGastos;
+
+        // Fondo del gráfico
+        doc.setFillColor(230, 230, 230);
+        doc.roundedRect(barX, barY, barWidth, barHeight, 2, 2, 'F');
+
+        // Barra de ingresos
+        if (total > 0) {
+          const ingresoWidth = (totalIngresos / total) * barWidth;
+          doc.setFillColor(39, 174, 96); // Verde
+          doc.roundedRect(barX, barY, ingresoWidth, barHeight, 2, 2, 'F');
+
+          // Barra de gastos
+          const gastoWidth = (totalGastos / total) * barWidth;
+          doc.setFillColor(231, 76, 60); // Rojo
+          doc.roundedRect(barX + ingresoWidth, barY, gastoWidth, barHeight, 2, 2, 'F');
+        }
+
+        // Leyenda
+        doc.setFillColor(39, 174, 96);
+        doc.rect(barX + barWidth + 10, barY - 3, 5, 5, 'F');
+        doc.setTextColor(50, 50, 50);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Ingresos: $${totalIngresos.toLocaleString()}`, barX + barWidth + 20, barY);
+
+        doc.setFillColor(231, 76, 60);
+        doc.rect(barX + barWidth + 10, barY + 7, 5, 5, 'F');
+        doc.text(`Gastos: $${totalGastos.toLocaleString()}`, barX + barWidth + 20, barY + 10);
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Balance: $${Math.abs(balance).toLocaleString()}`, barX, barY + 20);
+
+        // Información adicional sobre el periodo 
+        doc.setDrawColor(200, 200, 200);
+        doc.line(14, 90, doc.internal.pageSize.width - 14, 90);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(80, 80, 80);
+
+        const hoy = new Date();
+        const fechaInicio = new Date(hoy);
+        fechaInicio.setMonth(hoy.getMonth() - 1);
+
+        doc.text(`Periodo analizado: del ${fechaInicio.toLocaleDateString('es-ES')} al ${hoy.toLocaleDateString('es-ES')}`, 14, 96);
+
+        // Tabla de transacciones
+        const tableColumn = [
+          "Fecha", 
+          "Descripción", 
+          "Categoría", 
+          "Cuenta", 
+          "Monto"
+        ];
+
+        const tableRows = [];
+
+        // Convertir datos para la tabla - usamos el mismo formato que en printTransactions
+        dataToExport.forEach(transaction => {
+          const formattedDate = new Date(transaction.fecha).toLocaleDateString('es-ES');
+          const formattedAmount = `${transaction.tipo === 'ingreso' ? '+' : '-'}$${transaction.monto.toLocaleString()}`;
+
+          // Aplicar el mismo formato que en printTransactions para la cuenta
+          const accountDisplay = transaction.institution 
+            ? `${transaction.cuenta} - ${transaction.institution}`
+            : transaction.cuenta;
+            
+          const transactionData = [
+            formattedDate,
+            transaction.descripcion,
+            transaction.categoria || '—',
+            accountDisplay,
+            formattedAmount
+          ];
+          tableRows.push(transactionData);
+        });
+
+        // Añadir la tabla al documento
+        autoTable(doc, {
+          head: [tableColumn],
+          body: tableRows,
+          startY: 105,
+          theme: 'grid',
+          headStyles: {
+            fillColor: darkMode ? [50, 55, 65] : [59, 130, 246],
+            textColor: 255,
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245]
+          },
+          bodyStyles: {
+            fontSize: 9,
+            cellPadding: 4,
+          },
+          columnStyles: {
+            0: {cellWidth: 25, halign: 'center'}, // Fecha
+            1: {cellWidth: 45}, // Descripción
+            2: {cellWidth: 25}, // Categoría
+            3: {cellWidth: 40}, // Cuenta
+            4: {cellWidth: 25, halign: 'right'} // Monto
+          },
+          didDrawCell: (data) => {
+            // Colorear los montos según sea ingreso o gasto
+            if (data.section === 'body' && data.column.index === 4) {
+              const montoStr = data.cell.raw;
+              if (montoStr.startsWith('+')) {
+                doc.setTextColor(39, 174, 96); // Verde para ingresos
+              } else {
+                doc.setTextColor(231, 76, 60); // Rojo para gastos
+              }
+              return true; // Permitir que se dibuje el texto automáticamente
+            }
+            
+            return true; // Permitir que se dibuje el texto automáticamente para otras celdas
+          },
+          didDrawPage: function (data) {
+            // Añadir encabezado en cada página excepto la primera
+            if (data.pageNumber > 1) {
+              addHeader();
+            }
+          }
+        });
+
+        // Añadir pie de página
+        addFooter();
+
+        // Guardar el PDF
+        doc.save(`Plutus_Reporte_Transacciones_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        setSuccessMessage("Reporte PDF generado correctamente");
+        setTimeout(() => setSuccessMessage(""), 3000);
+      });
+    });
+  } catch (error) {
+    console.error('Error al exportar a PDF:', error);
+    setError("No se pudo generar el PDF. Inténtalo de nuevo.");
+    setTimeout(() => setError(""), 3000);
+  }
+};
+
 export default function TransactionsPage() {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -636,32 +898,6 @@ export default function TransactionsPage() {
   const [showDeleteMultipleModal, setShowDeleteMultipleModal] = useState(false);
   const deleteMultipleModalRef = useRef(null);
 
-  // Función para activar/desactivar el modo de selección multiple
-  const toggleSelectionMode = () => {
-    setSelectionMode(!selectionMode);
-    setSelectedTransactions({});
-    
-    if (!selectionMode) {
-      setSuccessMessage("Modo selección activado: selecciona las transacciones que deseas eliminar");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    }
-  };
-
-  // Función para seleccionar/deseleccionar todas las transacciones
-  const toggleSelectAll = () => {
-    if (Object.keys(selectedTransactions).length === currentTransactions.length) {
-      // Si todas están seleccionadas, deseleccionar todas
-      setSelectedTransactions({});
-    } else {
-      // Seleccionar todas
-      const allSelected = {};
-      currentTransactions.forEach(transaction => {
-        allSelected[transaction.id] = true;
-      });
-      setSelectedTransactions(allSelected);
-    }
-  };
-
   // Función para eliminar múltiples transacciones
   const deleteMultipleTransactions = async () => {
     try {
@@ -680,20 +916,24 @@ export default function TransactionsPage() {
         const transaction = transactions.find(t => t.id === transactionId);
         
         if (transaction) {
-          // Actualizar el saldo de la cuenta
-          const accountRef = doc(db, 'accounts', transaction.cuentaId);
-          const accountSnap = await getDoc(accountRef);
-          
-          if (accountSnap.exists()) {
-            const accountData = accountSnap.data();
-            const newBalance = transaction.tipo === 'ingreso'
-              ? accountData.balance - transaction.monto
-              : accountData.balance + transaction.monto;
+          // Actualizar el saldo de la cuenta solo si hay una cuentaId válida
+          if (transaction.cuentaId) {
+            const accountRef = doc(db, 'accounts', transaction.cuentaId);
+            const accountSnap = await getDoc(accountRef);
             
-            await updateDoc(accountRef, {
-              balance: newBalance,
-              updatedAt: new Date().toISOString()
-            });
+            if (accountSnap.exists()) {
+              const accountData = accountSnap.data();
+              const newBalance = transaction.tipo === 'ingreso'
+                ? accountData.balance - transaction.monto
+                : accountData.balance + transaction.monto;
+              
+              await updateDoc(accountRef, {
+                balance: newBalance,
+                updatedAt: new Date().toISOString()
+              });
+            }
+          } else {
+            console.log(`La transacción ${transactionId} no tiene una cuenta asociada o es efectivo.`);
           }
           
           // Eliminar la transacción
@@ -722,350 +962,92 @@ export default function TransactionsPage() {
     }
   };
 
-  // Función para exportar transacciones a PDF con diseño profesional
-  const exportTransactionsToPDF = () => {
-    try {
-      // Importar dinámicamente para evitar problemas con SSR
-      import('jspdf').then(({ default: jsPDF }) => {
-        import('jspdf-autotable').then(({ default: autoTable }) => {
-          // Filtrar las transacciones según los filtros actuales
-          const dataToExport = filteredTransactions;
-          
-          if (dataToExport.length === 0) {
-            setSuccessMessage("No hay transacciones para exportar con los filtros actuales");
-            setTimeout(() => setSuccessMessage(""), 3000);
-            return;
-          }
-          
-          // Crear un nuevo documento PDF
-          const doc = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-          });
-          
-          // Añadir encabezado con logo
-          const addHeader = () => {
-            // Dibujar un rectángulo de color para el encabezado
-            doc.setFillColor(darkMode ? 32 : 59, darkMode ? 44 : 130, darkMode ? 55 : 246);
-            doc.rect(0, 0, doc.internal.pageSize.width, 25, 'F');
-            
-            // Añadir título del documento
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(22);
-            doc.setTextColor(255, 255, 255);
-            doc.text('Reporte de Transacciones', 14, 15);
-            
-            // Añadir logo (representado como un círculo)
-            doc.setFillColor(255, 255, 255);
-            doc.circle(doc.internal.pageSize.width - 15, 12, 8, 'F');
-            
-            // Dibujar un icono de moneda dentro del círculo
-            doc.setFillColor(darkMode ? 32 : 59, darkMode ? 44 : 130, darkMode ? 55 : 246);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
-            doc.setTextColor(darkMode ? 32 : 59, darkMode ? 44 : 130, darkMode ? 55 : 246);
-            doc.text('P', doc.internal.pageSize.width - 15, 15, { align: 'center' });
-            
-            // Resetear estilo de texto
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont('helvetica', 'normal');
-          };
-          
-          // Añadir pie de página con número de página
-          const addFooter = () => {
-            const pageCount = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-              doc.setPage(i);
-              
-              // Añadir línea divisoria
-              doc.setDrawColor(200, 200, 200);
-              doc.line(14, doc.internal.pageSize.height - 20, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 20);
-              
-              // Añadir texto del pie de página
-              doc.setFontSize(8);
-              doc.setTextColor(100, 100, 100);
-              doc.text(`Generado el ${new Date().toLocaleDateString('es-ES', { 
-                day: '2-digit', 
-                month: 'long', 
-                year: 'numeric' 
-              })}`, 14, doc.internal.pageSize.height - 15);
-              
-              // Añadir número de página
-              doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 15);
-            }
-          };
-          
-          // Aplicar el encabezado
-          addHeader();
-          
-          // Meta-información para el PDF
-          doc.setProperties({
-            title: 'Reporte de Transacciones',
-            subject: 'Historial de transacciones financieras',
-            author: 'Plutus',
-            keywords: 'finanzas, transacciones, reporte',
-            creator: 'Plutus App'
-          });
-          
-          // Añadir fecha de generación y periodo
-          doc.setFontSize(10);
-          doc.setTextColor(80, 80, 80);
-          doc.text(`Fecha de generación: ${new Date().toLocaleDateString('es-ES', { 
-            day: '2-digit', 
-            month: 'long', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })}`, 14, 30);
-          
-          // Añadir filtros aplicados
-          doc.text(`Filtro aplicado: ${filter === 'all' ? 'Todas las transacciones' : filter === 'ingresos' ? 'Solo ingresos' : 'Solo gastos'}`, 14, 35);
-          if (searchTerm) {
-            doc.text(`Término de búsqueda: "${searchTerm}"`, 14, 40);
-          }
-          
-          // Añadir resumen financiero
-          doc.setFillColor(245, 245, 245);
-          doc.roundedRect(14, 45, doc.internal.pageSize.width - 28, 35, 3, 3, 'F');
-          
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(12);
-          doc.setTextColor(50, 50, 50);
-          doc.text('Resumen Financiero', 20, 55);
-          
-          // Crear gráfico visual de la distribución
-          const barWidth = 120;
-          const barHeight = 8;
-          const barX = 20;
-          const barY = 70;
-          
-          // Total para calcular porcentajes
-          const total = totalIngresos + totalGastos;
-          
-          // Fondo del gráfico
-          doc.setFillColor(230, 230, 230);
-          doc.roundedRect(barX, barY, barWidth, barHeight, 2, 2, 'F');
-          
-          // Barra de ingresos
-          if (total > 0) {
-            const ingresoWidth = (totalIngresos / total) * barWidth;
-            doc.setFillColor(39, 174, 96); // Verde
-            doc.roundedRect(barX, barY, ingresoWidth, barHeight, 2, 2, 'F');
-            
-            // Barra de gastos
-            const gastoWidth = (totalGastos / total) * barWidth;
-            doc.setFillColor(231, 76, 60); // Rojo
-            doc.roundedRect(barX + ingresoWidth, barY, gastoWidth, barHeight, 2, 2, 'F');
-          }
-          
-          // Leyenda
-          doc.setFillColor(39, 174, 96);
-          doc.rect(barX + barWidth + 10, barY - 3, 5, 5, 'F');
-          doc.setTextColor(50, 50, 50);
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'normal');
-          doc.text(`Ingresos: $${totalIngresos.toLocaleString()}`, barX + barWidth + 20, barY);
-          
-          doc.setFillColor(231, 76, 60);
-          doc.rect(barX + barWidth + 10, barY + 7, 5, 5, 'F');
-          doc.text(`Gastos: $${totalGastos.toLocaleString()}`, barX + barWidth + 20, barY + 10);
-          
-          doc.setFont('helvetica', 'bold');
-          doc.text(`Balance: $${Math.abs(balance).toLocaleString()}`, barX, barY + 20);
-          
-          // Información adicional sobre el periodo 
-          doc.setDrawColor(200, 200, 200);
-          doc.line(14, 90, doc.internal.pageSize.width - 14, 90);
-          
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(10);
-          doc.setTextColor(80, 80, 80);
-          
-          const hoy = new Date();
-          const fechaInicio = new Date(hoy);
-          fechaInicio.setMonth(hoy.getMonth() - 1);
-          
-          doc.text(`Periodo analizado: del ${fechaInicio.toLocaleDateString('es-ES')} al ${hoy.toLocaleDateString('es-ES')}`, 14, 96);
-          
-          // Tabla de transacciones
-          const tableColumn = [
-            "Fecha", 
-            "Descripción", 
-            "Categoría", 
-            "Cuenta", 
-            "Monto", 
-            "Tipo"
-          ];
-          
-          const tableRows = [];
-          
-          // Convertir datos para la tabla
-          dataToExport.forEach(transaction => {
-            const formattedDate = new Date(transaction.fecha).toLocaleDateString('es-ES');
-            const formattedAmount = `$${transaction.monto.toLocaleString()}`;
-            const transactionData = [
-              formattedDate,
-              transaction.descripcion,
-              transaction.categoria || '—',
-              transaction.cuenta,
-              formattedAmount,
-              transaction.tipo === 'ingreso' ? 'Ingreso' : 'Gasto'
-            ];
-            tableRows.push(transactionData);
-          });
-          
-          // Añadir la tabla al documento
-          autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 105,
-            theme: 'grid',
-            headStyles: {
-              fillColor: darkMode ? [50, 55, 65] : [59, 130, 246],
-              textColor: 255,
-              fontStyle: 'bold',
-              halign: 'center'
-            },
-            alternateRowStyles: {
-              fillColor: [245, 245, 245]
-            },
-            bodyStyles: {
-              fontSize: 9,
-              cellPadding: 4,
-            },
-            columnStyles: {
-              0: {cellWidth: 25, halign: 'center'}, // Fecha
-              1: {cellWidth: 45}, // Descripción
-              2: {cellWidth: 25}, // Categoría
-              3: {cellWidth: 30}, // Cuenta
-              4: {cellWidth: 25, halign: 'right'}, // Monto
-              5: {cellWidth: 20, halign: 'center'} // Tipo
-            },
-            didDrawCell: (data) => {
-              // Colorear la celda de tipo según sea ingreso o gasto
-              if (data.section === 'body' && data.column.index === 5) {
-                const tipo = data.cell.raw;
-                if (tipo === 'Ingreso') {
-                  doc.setFillColor(39, 174, 96, 0.2);  // Verde transparente
-                  doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
-                  doc.setTextColor(39, 174, 96);
-                  doc.text(tipo, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, {
-                    align: 'center',
-                    baseline: 'middle'
-                  });
-                  return false; // Evitar que se dibuje el texto automáticamente
-                } else if (tipo === 'Gasto') {
-                  doc.setFillColor(231, 76, 60, 0.2);  // Rojo transparente
-                  doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
-                  doc.setTextColor(231, 76, 60);
-                  doc.text(tipo, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, {
-                    align: 'center',
-                    baseline: 'middle'
-                  });
-                  return false; // Evitar que se dibuje el texto automáticamente
-                }
-              }
-              
-              // Colorear los montos según sea ingreso o gasto
-              if (data.section === 'body' && data.column.index === 4) {
-                const tipo = data.row.cells[5].raw;
-                if (tipo === 'Ingreso') {
-                  doc.setTextColor(39, 174, 96); // Verde
-                } else {
-                  doc.setTextColor(231, 76, 60); // Rojo
-                }
-                return true; // Permitir que se dibuje el texto automáticamente
-              }
-              
-              return true; // Permitir que se dibuje el texto automáticamente para otras celdas
-            },
-            didDrawPage: function (data) {
-              // Añadir encabezado en cada página excepto la primera
-              if (data.pageNumber > 1) {
-                addHeader();
-              }
-            }
-          });
-          
-          // Añadir pie de página
-          addFooter();
-          
-          // Guardar el PDF
-          doc.save(`Plutus_Reporte_Transacciones_${new Date().toISOString().split('T')[0]}.pdf`);
-          
-          setSuccessMessage("Reporte PDF generado correctamente");
-          setTimeout(() => setSuccessMessage(""), 3000);
-        });
+  // Función para activar/desactivar el modo de selección multiple
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedTransactions({});
+    
+    if (!selectionMode) {
+      setSuccessMessage("Modo selección activado: selecciona las transacciones que deseas eliminar");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    }
+  };
+
+  // Función para seleccionar/deseleccionar todas las transacciones
+  const toggleSelectAll = () => {
+    if (Object.keys(selectedTransactions).length === currentTransactions.length) {
+      // Si todas están seleccionadas, deseleccionar todas
+      setSelectedTransactions({});
+    } else {
+      // Seleccionar todas
+      const allSelected = {};
+      currentTransactions.forEach(transaction => {
+        allSelected[transaction.id] = true;
       });
-    } catch (error) {
-      console.error('Error al exportar a PDF:', error);
-      setError("No se pudo generar el PDF. Inténtalo de nuevo.");
-      setTimeout(() => setError(""), 3000);
+      setSelectedTransactions(allSelected);
     }
   };
 
   // Función para exportar transacciones a CSV
   const exportTransactionsToCSV = () => {
-    try {
-      // Filtrar las transacciones según los filtros actuales
-      const dataToExport = filteredTransactions;
-      
-      if (dataToExport.length === 0) {
-        setSuccessMessage("No hay transacciones para exportar con los filtros actuales");
-        setTimeout(() => setSuccessMessage(""), 3000);
-        return;
-      }
-      
-      // Definir las columnas del CSV
-      const headers = [
-        'Descripción',
-        'Categoría',
-        'Monto',
-        'Tipo',
-        'Fecha',
-        'Cuenta'
-      ];
-      
-      // Convertir los datos a formato CSV
-      const csvContent = [
-        headers.join(','), // Encabezados
-        ...dataToExport.map(transaction => [
-          // Escapar comas y comillas en los campos de texto
-          `"${transaction.descripcion.replace(/"/g, '""')}"`,
-          `"${transaction.categoria ? transaction.categoria.replace(/"/g, '""') : ''}"`,
-          transaction.monto,
-          transaction.tipo,
-          new Date(transaction.fecha).toLocaleDateString('es-ES'),
-          `"${transaction.cuenta.replace(/"/g, '""')}"`
-        ].join(','))
-      ].join('\n');
-      
-      // Crear un blob con los datos
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      
-      // Crear un link para descargar el archivo
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      
-      // Configurar el link
-      link.setAttribute('href', url);
-      link.setAttribute('download', `plutus_transacciones_${new Date().toISOString().split('T')[0]}.csv`);
-      
-      // Añadir el link al documento, hacer clic y eliminarlo
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      setSuccessMessage("Transacciones exportadas a CSV correctamente");
+  try {
+    // Filtrar las transacciones según los filtros actuales
+    const dataToExport = filteredTransactions;
+    
+    if (dataToExport.length === 0) {
+      setSuccessMessage("No hay transacciones para exportar con los filtros actuales");
       setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (error) {
-      console.error('Error al exportar las transacciones a CSV:', error);
-      setError("No se pudieron exportar las transacciones a CSV");
-      setTimeout(() => setError(""), 3000);
+      return;
     }
-  };
+    
+    // Definir las columnas del CSV
+    const headers = [
+      'Descripción',
+      'Categoría',
+      'Monto',
+      'Tipo',
+      'Fecha',
+      'Cuenta'
+    ];
+    
+    // Convertir los datos a formato CSV
+    const csvContent = [
+      headers.join(','), // Encabezados
+      ...dataToExport.map(transaction => [
+        // Escapar comas y comillas en los campos de texto
+        `"${transaction.descripcion.replace(/"/g, '""')}"`,
+        `"${transaction.categoria ? transaction.categoria.replace(/"/g, '""') : ''}"`,
+        transaction.monto,
+        transaction.tipo,
+        new Date(transaction.fecha).toLocaleDateString('es-ES'),
+        `"${transaction.cuenta.replace(/"/g, '""')}"`
+      ].join(','))
+    ].join('\n');
+    
+    // Crear un blob con los datos
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Crear un link para descargar el archivo
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    // Configurar el link
+    link.setAttribute('href', url);
+    link.setAttribute('download', `plutus_transacciones_${new Date().toISOString().split('T')[0]}.csv`);
+    
+    // Añadir el link al documento, hacer clic y eliminarlo
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setSuccessMessage("Transacciones exportadas a CSV correctamente");
+    setTimeout(() => setSuccessMessage(""), 3000);
+  } catch (error) {
+    console.error('Error al exportar las transacciones a CSV:', error);
+    setError("No se pudieron exportar las transacciones a CSV");
+    setTimeout(() => setError(""), 3000);
+  }
+};
 
   // Función para abrir el modal de edición
   const handleEditTransaction = (transaction) => {
@@ -1213,20 +1195,24 @@ export default function TransactionsPage() {
     try {
       setLoading(true);
       
-      // Actualizar el saldo de la cuenta
-      const accountRef = doc(db, 'accounts', transactionToDelete.cuentaId);
-      const accountSnap = await getDoc(accountRef);
-      
-      if (accountSnap.exists()) {
-        const accountData = accountSnap.data();
-        const newBalance = transactionToDelete.tipo === 'ingreso'
-          ? accountData.balance - transactionToDelete.monto
-          : accountData.balance + transactionToDelete.monto;
+      // Actualizar el saldo de la cuenta solo si la transacción tiene una cuenta asociada
+      if (transactionToDelete.cuentaId) {
+        const accountRef = doc(db, 'accounts', transactionToDelete.cuentaId);
+        const accountSnap = await getDoc(accountRef);
         
-        await updateDoc(accountRef, {
-          balance: newBalance,
-          updatedAt: new Date().toISOString()
-        });
+        if (accountSnap.exists()) {
+          const accountData = accountSnap.data();
+          const newBalance = transactionToDelete.tipo === 'ingreso'
+            ? accountData.balance - transactionToDelete.monto
+            : accountData.balance + transactionToDelete.monto;
+          
+          await updateDoc(accountRef, {
+            balance: newBalance,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } else {
+        console.log('Transacción de efectivo eliminada - no hay cuenta que actualizar');
       }
       
       // Eliminar la transacción
@@ -1276,6 +1262,49 @@ export default function TransactionsPage() {
     };
   }, [optionsMenuRef]);
   
+  // Efecto para detectar parámetros URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const newTransactionParam = params.get('newTransaction');
+      
+      if (newTransactionParam === 'efectivo') {
+        // Abrir modal de nueva transacción con cuenta efectivo preseleccionada
+        setIsModalOpen(true);
+        setTransactionType('gasto'); // Preseleccionar tipo gasto por defecto
+        
+        // Esperar a que el modal se cargue completamente
+        setTimeout(() => {
+          const cuentaInput = document.getElementById('cuenta');
+          if (cuentaInput) {
+            // Buscar la cuenta de efectivo en las cuentas del usuario
+            const efectivoCuenta = userAccounts.find(account => 
+              account.name.toLowerCase() === 'efectivo' || 
+              account.type === 'efectivo'
+            );
+            
+            if (efectivoCuenta) {
+              cuentaInput.value = efectivoCuenta.id;
+            } else {
+              // Si no hay una cuenta de efectivo específica, usar "efectivo"
+              cuentaInput.value = 'efectivo';
+            }
+          }
+          
+          // También establecer la fecha automáticamente
+          const fechaInput = document.getElementById('fecha');
+          if (fechaInput) {
+            fechaInput.value = new Date().toISOString().split('T')[0];
+          }
+        }, 300);
+        
+        // Limpiar los parámetros de la URL para evitar que se abra el modal nuevamente si se recarga la página
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, [userAccounts]);
+
   // Asegurar que el componente está montado antes de renderizar elementos dependientes del tema
   useEffect(() => {
     setMounted(true);
@@ -1330,6 +1359,8 @@ export default function TransactionsPage() {
           new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
         );
         setTransactions(sortedTransactions);
+        // Resetear a la primera página cuando cambian las transacciones
+        setCurrentPage(1);
       } else {
         // Si no hay transacciones del usuario, usar array vacío en lugar de datos de ejemplo
         setTransactions([]);
@@ -1352,7 +1383,7 @@ export default function TransactionsPage() {
       
       if (!currentUser) {
         setError('Debes iniciar sesión para registrar una transacción');
-        setTimeout(() => setError(''), 3000); // Añadir timeout para el error
+        setTimeout(() => setError(''), 3000);
         return;
       }
       
@@ -1366,7 +1397,7 @@ export default function TransactionsPage() {
       // Validar campos obligatorios
       if (!descripcionInput.value || !montoInput.value || !fechaInput.value || !cuentaInput.value) {
         setError('Por favor completa todos los campos obligatorios');
-        setTimeout(() => setError(''), 3000); // Añadir timeout para el error
+        setTimeout(() => setError(''), 3000);
         return;
       }
       
@@ -1374,7 +1405,7 @@ export default function TransactionsPage() {
       const cuentaSeleccionada = userAccounts.find(account => account.id === cuentaInput.value);
       if (!cuentaSeleccionada && cuentaInput.value !== 'efectivo') {
         setError('Por favor selecciona una cuenta válida');
-        setTimeout(() => setError(''), 3000); // Añadir timeout para el error
+        setTimeout(() => setError(''), 3000);
         return;
       }
       
@@ -1382,7 +1413,7 @@ export default function TransactionsPage() {
       const monto = parseFloat(montoInput.value);
       if (transactionType === 'gasto' && cuentaInput.value !== 'efectivo' && monto > cuentaSeleccionada.balance) {
         setError(`Fondos insuficientes en ${cuentaSeleccionada.name}. El saldo actual es $${cuentaSeleccionada.balance.toLocaleString()}`);
-        setTimeout(() => setError(''), 3000); // Añadir timeout para el error
+        setTimeout(() => setError(''), 3000);
         return;
       }
       
@@ -1432,7 +1463,7 @@ export default function TransactionsPage() {
     } catch (error) {
       console.error('Error al registrar la transacción:', error);
       setError('No se pudo registrar la transacción. Inténtalo de nuevo.');
-      setTimeout(() => setError(''), 3000); // Añadir timeout para el error
+      setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
     }
@@ -1489,11 +1520,16 @@ export default function TransactionsPage() {
   const categoriasGastos = ['Alimentación', 'Vivienda', 'Transporte', 'Ocio', 'Salud', 'Educación', 'Compras', 'Facturas', 'Otros'];
 
   return (
-    <div className={`container mx-auto h-screen px-4 py-8 ${darkMode ? 'bg-gray-900 text-white' : ''}`}>
+    <div className={`container mx-auto min-h-screen px-4 py-8 ${darkMode ? 'bg-gray-900 text-white' : ''}`}>
       {/* Mensaje de éxito (solo este, quitamos el de error) */}
       {successMessage && (
         <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg">
           {successMessage}
+        </div>
+      )}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg">
+          {error}
         </div>
       )}
 
@@ -1530,8 +1566,7 @@ export default function TransactionsPage() {
                 className={`absolute right-0 z-10 mt-2 w-48 rounded-md shadow-lg ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-200'} border`}
                 style={{ 
                   animation: 'dropdown-in 0.3s ease-out forwards',
-                  top: 'auto',
-                  bottom: window.innerHeight - document.getElementById('transaction-container')?.getBoundingClientRect().bottom + 10 < 180 ? '100%' : 'auto',
+                  top: '100%',
                   right: 0
                 }}
               >
@@ -1758,31 +1793,42 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Paginación */}
+      {/* Paginación mejorada */}
       {filteredTransactions.length > transactionsPerPage && (
-        <div className="flex justify-center">
+        <div className={`flex flex-wrap justify-center items-center gap-2 mt-6 rounded-xl p-4 shadow-sm border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <nav className="inline-flex rounded-md shadow">
             <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="px-3 py-1 rounded-l-md border border-gray-300 bg-white text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200"
+              className={`px-3 py-2 rounded-l-md border cursor-pointer ${
+                darkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-300 disabled:text-gray-600' 
+                  : 'bg-gray-50 border-gray-300 text-gray-700 disabled:text-gray-400'
+              } disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600 dark:hover:bg-gray-600`}
             >
-              Anterior
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M15.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M7.707 15.707a1 1 0 01-1.414 0l-5-5a1 1 0 010-1.414l5-5a1 1 0 111.414 1.414L3.414 10l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
             </button>
             
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-1 border-t border-b border-gray-300 ${
-                  currentPage === page 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
+            {/* Generar números de página */}
+            {[...Array(totalPages)].map((_, index) => {
+              const pageNumber = index + 1;
+              return (
+                <button
+                  key={pageNumber}
+                  onClick={() => setCurrentPage(pageNumber)}
+                  className={`px-3 py-1 border-t border-b border-gray-300 ${
+                    currentPage === pageNumber
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200'
+                  }`}
+                >
+                  {pageNumber}
+                </button>
+              );
+            })}
             
             <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
@@ -1795,7 +1841,7 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Modal para añadir nueva transacción */}
+      {/* Modal para añadir   sacción */}
       {isModalOpen && (
         <div 
           className={`fixed inset-0 flex items-center justify-center z-[100] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
@@ -1844,11 +1890,9 @@ export default function TransactionsPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
                       </svg>
                     </div>
-                    <span className={`text-sm font-medium ${transactionType === 'ingreso' ? (darkMode ? 'text-green-300' : 'text-green-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-                      Ingreso
-                    </span>
+                    <span className={`text-sm ${transactionType === 'ingreso' ? darkMode ? 'text-green-400' : 'text-green-600' : darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Ingreso</span>
                   </div>
-                  
+
                   <div 
                     className={`flex-1 p-3 border rounded-lg cursor-pointer flex flex-col items-center ${
                       transactionType === 'gasto' 
@@ -1862,158 +1906,148 @@ export default function TransactionsPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
                       </svg>
                     </div>
-                    <span className={`text-sm font-medium ${transactionType === 'gasto' ? (darkMode ? 'text-red-300' : 'text-red-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-                      Gasto
-                    </span>
+                    <span className={`text-sm ${transactionType === 'gasto' ? darkMode ? 'text-red-400' : 'text-red-600' : darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Gasto</span>
                   </div>
                 </div>
               </div>
-              
-              {/* Descripción */}
+
+              {/* Resto del formulario... */}
               <div className="mb-4">
-                <label htmlFor="descripcion" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Descripción *
+                <label htmlFor="descripcion" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  Descripción <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  id="descripcion"
-                  placeholder="Ej: Supermercado, Salario, etc."
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder:text-gray-400' : 'bg-white border-gray-300 placeholder:text-gray-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                <input 
+                  type="text" 
+                  id="descripcion" 
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                  }`}
+                  placeholder="Ej: Compra supermercado, Nómina..."
                   required
                 />
               </div>
-              
-              {/* Categoría */}
+
               <div className="mb-4">
-                <label htmlFor="categoria" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
+                <label htmlFor="categoria" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
                   Categoría
                 </label>
-                <select
-                  id="categoria"
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                <select 
+                  id="categoria" 
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                  }`}
                 >
                   <option value="">Selecciona una categoría</option>
-                  {transactionType === 'ingreso' 
-                    ? categoriasIngresos.map(cat => <option key={cat} value={cat}>{cat}</option>)
-                    : categoriasGastos.map(cat => <option key={cat} value={cat}>{cat}</option>)
-                  }
+                  {transactionType === 'ingreso' ? (
+                    categoriasIngresos.map((cat, index) => (
+                      <option key={index} value={cat}>{cat}</option>
+                    ))
+                  ) : (
+                    categoriasGastos.map((cat, index) => (
+                      <option key={index} value={cat}>{cat}</option>
+                    ))
+                  )}
                 </select>
               </div>
-              
-              {/* Monto */}
+
               <div className="mb-4">
-                <label htmlFor="monto" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Monto *
+                <label htmlFor="monto" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  Monto <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
                   </div>
-                  <input
-                    type="number"
-                    id="monto"
-                    min="0.01"
-                    step="0.01"
+                  <input 
+                    type="number" 
+                    id="monto" 
+                    className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                      darkMode 
+                        ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                        : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                    }`}
                     placeholder="0.00"
-                    className={`w-full pl-8 px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder:text-gray-400' : 'bg-white border-gray-300 placeholder:text-gray-400'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    step="0.01"
+                    min="0.01"
                     required
                   />
                 </div>
               </div>
-              
-              {/* Fecha */}
+
               <div className="mb-4">
-                <label htmlFor="fecha" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Fecha *
+                <label htmlFor="fecha" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  Fecha <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="date"
-                  id="fecha"
-                  defaultValue={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                <input 
+                  type="date" 
+                  id="fecha" 
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                  }`}
                   required
                 />
               </div>
-              
-              {/* Cuenta */}
-              <div className="mb-6">
-                <label htmlFor="cuenta" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Cuenta *
-                </label>
-                <div className="space-y-2">
-                  {/* Opción para efectivo */}
-                  <div className={`p-3 border rounded-lg cursor-pointer flex items-center ${
-                    document.getElementById('cuenta')?.value === 'efectivo'
-                      ? `bg-yellow-50 border-yellow-500 ${darkMode ? 'bg-yellow-900 bg-opacity-20' : ''}`
-                      : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                  onClick={() => {
-                    const selectElement = document.getElementById('cuenta');
-                    if (selectElement) {
-                      selectElement.value = 'efectivo';
-                      // Disparar evento para que React detecte el cambio
-                      const event = new Event('change', { bubbles: true });
-                      selectElement.dispatchEvent(event);
-                    }
-                  }}>
-                    <div className={`p-2 rounded-full ${
-                      document.getElementById('cuenta')?.value === 'efectivo' ? 'bg-yellow-100' : 'bg-gray-100'
-                    } mr-3`}>
-                      <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${
-                        document.getElementById('cuenta')?.value === 'efectivo' ? 'text-yellow-600' : 'text-gray-500'
-                      }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <span className={`text-sm font-medium ${
-                      document.getElementById('cuenta')?.value === 'efectivo' 
-                        ? (darkMode ? 'text-yellow-300' : 'text-yellow-700') 
-                        : (darkMode ? 'text-gray-300' : 'text-gray-700')
-                    }`}>
-                      Efectivo
-                    </span>
-                  </div>
 
-                  {/* Selector de cuentas bancarias */}
-                  <select
-                    id="cuenta"
-                    className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    required
-                  >
-                    <option value="">Selecciona una cuenta</option>
-                    <option value="efectivo">Efectivo</option>
-                    {userAccounts.map(account => (
-                      <option key={account.id} value={account.id}>
-                        {account.name} - {account.institution} (${account.balance.toLocaleString()})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="mb-6">
+                <label htmlFor="cuenta" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                  Cuenta <span className="text-red-500">*</span>
+                </label>
+                <select 
+                  id="cuenta" 
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                  }`}
+                  required
+                >
+                  <option value="">Selecciona una cuenta</option>
+                  <option value="efectivo">Efectivo</option>
+                  {userAccounts.map(account => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} - {account.institution || "Sin institución"} (${account.balance?.toLocaleString()})
+                    </option>
+                  ))}
+                </select>
               </div>
-              
-              {/* Botones */}
-              <div className="flex gap-2">
+
+              <div className="flex justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className={`flex-1 px-4 py-2 cursor-pointer ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition-colors`}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                  disabled={loading}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
+                  className={`px-4 py-2 rounded-lg font-medium text-sm text-white transition ${
+                    darkMode
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                   disabled={loading}
-                  className="flex-1 px-4 py-2 cursor-pointer bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {loading ? (
-                    <>
+                    <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       Guardando...
-                    </>
-                  ) : "Guardar transacción" }
+                    </span>
+                  ) : 'Guardar transacción'}
                 </button>
               </div>
             </form>
@@ -2021,15 +2055,160 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Modal para editar transacción */}
+      {/* Modal de confirmación para eliminar múltiples transacciones */}
+      {showDeleteMultipleModal && (
+        <div 
+          className={`fixed inset-0 flex items-center justify-center z-[100] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
+          onClick={(e) => {
+            if (deleteMultipleModalRef.current && !deleteMultipleModalRef.current.contains(e.target)) {
+              setShowDeleteMultipleModal(false);
+            }
+          }}
+        >
+          <div
+            ref={deleteMultipleModalRef}
+            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6`}
+          >
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>Eliminar transacciones</h3>
+              <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-2`}>
+                ¿Estás seguro de que deseas eliminar las {Object.values(selectedTransactions).filter(Boolean).length} transacciones seleccionadas? Esta acción no se puede deshacer.
+              </p>
+              <p className={`text-xs ${darkMode ? 'text-yellow-300' : 'text-yellow-600'} mb-6`}>
+                Nota: Esta acción afectará a los saldos de las cuentas asociadas.
+              </p>
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 justify-center">
+                <button
+                  onClick={() => setShowDeleteMultipleModal(false)}
+                  className={`cursor-pointer  px-4 py-2 rounded-lg font-medium text-sm transition ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={deleteMultipleTransactions}
+                  className="px-4 py-2 rounded-lg font-medium text-sm text-white transition bg-red-600 hover:bg-red-700"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Eliminando...
+                    </span>
+                  ) : 'Eliminar transacciones'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación para eliminar una transacción */}
+      {showDeleteModal && (
+        <div 
+          className={`fixed inset-0 flex items-center justify-center z-[100] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
+          onClick={(e) => {
+            if (deleteModalRef.current && !deleteModalRef.current.contains(e.target)) {
+              setShowDeleteModal(false);
+            }
+          }}
+        >
+          <div 
+            ref={deleteModalRef}
+            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6`}
+          >
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>Eliminar transacción</h3>
+              <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'} mb-2`}>
+                ¿Estás seguro de que deseas eliminar esta transacción? Esta acción no se puede deshacer.
+              </p>
+              <div className="mt-2 mb-4">
+                <div className={`inline-flex items-center justify-center h-10 w-10 rounded-full mb-2 ${
+                  transactionToDelete?.tipo === 'ingreso' 
+                    ? darkMode ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-600' 
+                    : darkMode ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-600'
+                }`}>
+                  {transactionToDelete?.tipo === 'ingreso' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>{transactionToDelete?.descripcion}</p>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{transactionToDelete?.cuenta}</p>
+                  <p className={`font-medium ${
+                    transactionToDelete?.tipo === 'ingreso' 
+                      ? darkMode ? 'text-green-400' : 'text-green-600' 
+                      : darkMode ? 'text-red-400' : 'text-red-600'
+                  }`}>${transactionToDelete?.monto?.toLocaleString()}</p>
+                </div>
+              </div>
+              <p className={`text-xs ${darkMode ? 'text-yellow-300' : 'text-yellow-600'} mb-6`}>
+                Nota: Esta acción afectará al saldo de la cuenta asociada.
+              </p>
+              <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2 justify-center">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className={`cursor-pointer px-4 py-2 rounded-lg font-medium text-sm transition ${
+                    darkMode
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteTransaction}
+                  className="cursor-pointer px-4 py-2 rounded-lg font-medium text-sm text-white transition bg-red-600 hover:bg-red-700"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Eliminando...
+                    </span>
+                  ) : 'Eliminar transacción'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para editar una transacción */}
       {isEditingTransaction && editingTransaction && (
         <div 
-          className={`fixed inset-0 flex items-center justify-center z-[110] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
-          onClick={(event) => {
-            if (editModalRef.current && !editModalRef.current.contains(event.target)) {
+          className={`fixed inset-0 flex items-center justify-center z-[100] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
+          onClick={(e) => {
+            if (editModalRef.current && !editModalRef.current.contains(e.target)) {
               setIsEditingTransaction(false);
               setEditingTransaction(null);
-              setError('');
             }
           }}
         >
@@ -2045,8 +2224,7 @@ export default function TransactionsPage() {
                 onClick={() => {
                   setIsEditingTransaction(false);
                   setEditingTransaction(null);
-                  setError('');
-                }}
+                }} 
                 className={`cursor-pointer ${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
               >
                 &times;
@@ -2060,262 +2238,184 @@ export default function TransactionsPage() {
               </div>
             )}
             
-            <div className="mt-4 space-y-4">
-              {/* Tipo de transacción (mostrar pero no editable) */}
-              <div>
-                <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Tipo de transacción
-                </label>
-                <div className={`px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-100 border-gray-300 text-gray-700'}`}>
-                  {editingTransaction.tipo === 'ingreso' ? (
-                    <div className="flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                      </svg>
-                      <span>Ingreso</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-                      </svg>
-                      <span>Gasto</span>
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">El tipo de transacción no se puede cambiar</p>
-              </div>
-              
-              {/* Descripción */}
-              <div>
-                <label htmlFor="edit-descripcion" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Descripción *
-                </label>
-                <input
-                  type="text"
-                  id="edit-descripcion"
-                  defaultValue={editingTransaction.descripcion}
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  required
-                />
-              </div>
-              
-              {/* Categoría */}
-              <div>
-                <label htmlFor="edit-categoria" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Categoría
-                </label>
-                <select
-                  id="edit-categoria"
-                  defaultValue={editingTransaction.categoria || ""}
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                >
-                  <option value="">Selecciona una categoría</option>
-                  {editingTransaction.tipo === 'ingreso' 
-                    ? categoriasIngresos.map(cat => <option key={cat} value={cat}>{cat}</option>)
-                    : categoriasGastos.map(cat => <option key={cat} value={cat}>{cat}</option>)
-                  }
-                </select>
-              </div>
-              
-              {/* Monto */}
-              <div>
-                <label htmlFor="edit-monto" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Monto *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
-                  </div>
-                  <input
-                    type="number"
-                    id="edit-monto"
-                    min="0.01"
-                    step="0.01"
-                    defaultValue={editingTransaction.monto}
-                    className={`w-full pl-8 px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    required
-                  />
-                </div>
-              </div>
-              
-              {/* Fecha */}
-              <div>
-                <label htmlFor="edit-fecha" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Fecha *
-                </label>
-                <input
-                  type="date"
-                  id="edit-fecha"
-                  defaultValue={editingTransaction.fecha ? new Date(editingTransaction.fecha).toISOString().split('T')[0] : ''}
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  required
-                />
-              </div>
-              
-              {/* Cuenta */}
-              <div>
-                <label htmlFor="edit-cuenta" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>
-                  Cuenta *
-                </label>
-                <select
-                  id="edit-cuenta"
-                  defaultValue={editingTransaction.cuentaId || ""}
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                  required
-                >
-                  <option value="">Selecciona una cuenta</option>
-                  {userAccounts.map(account => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} - {account.institution} (${account.balance.toLocaleString()})
-                    </option>
-                  ))}
-                </select>
+            {/* Tipo de transacción (solo lectura) */}
+            <div className="mb-4">
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Tipo de transacción
+              </label>
+              <div className={`p-3 rounded-lg ${
+                editingTransaction.tipo === 'ingreso' 
+                  ? darkMode ? 'bg-green-900/20 text-green-400 border border-green-600/30' : 'bg-green-50 text-green-700 border border-green-200'
+                  : darkMode ? 'bg-red-900/20 text-red-400 border border-red-600/30' : 'bg-red-50 text-red-700 border border-red-200'
+              } flex items-center`}>
+                {editingTransaction.tipo === 'ingreso' ? (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                    </svg>
+                    <span className="font-medium">Ingreso</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                    </svg>
+                    <span className="font-medium">Gasto</span>
+                  </>
+                )}
               </div>
             </div>
             
-            {/* Botones de acción */}
-            <div className="mt-6 flex gap-2">
+            <div className="mb-4">
+              <label htmlFor="edit-descripcion" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Descripción <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="edit-descripcion" 
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                }`}
+                placeholder="Ej: Compra supermercado, Nómina..."
+                defaultValue={editingTransaction.descripcion}
+                required
+              />
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="edit-categoria" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Categoría
+              </label>
+              <select 
+                id="edit-categoria" 
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                }`}
+                defaultValue={editingTransaction.categoria || ''}
+              >
+                <option value="">Selecciona una categoría</option>
+                {editingTransaction.tipo === 'ingreso' ? (
+                  categoriasIngresos.map((cat, index) => (
+                    <option key={index} value={cat}>{cat}</option>
+                  ))
+                ) : (
+                  categoriasGastos.map((cat, index) => (
+                    <option key={index} value={cat}>{cat}</option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="edit-monto" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Monto <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                </div>
+                <input 
+                  type="number" 
+                  id="edit-monto" 
+                  className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                      : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                  }`}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0.01"
+                  defaultValue={editingTransaction.monto}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="edit-fecha" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Fecha <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="date" 
+                id="edit-fecha" 
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                }`}
+                defaultValue={new Date(editingTransaction.fecha).toISOString().split('T')[0]}
+                required
+              />
+            </div>
+
+            <div className="mb-6">
+              <label htmlFor="edit-cuenta" className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>
+                Cuenta <span className="text-red-500">*</span>
+              </label>
+              <select 
+                id="edit-cuenta" 
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500' 
+                    : 'bg-white border-gray-300 text-gray-900 focus:ring-blue-600 focus:border-blue-600'
+                }`}
+                defaultValue={editingTransaction.cuentaId || ''}
+                required
+              >
+                <option value="">Selecciona una cuenta</option>
+                <option value="efectivo">Efectivo</option>
+                {userAccounts.map(account => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} - {account.institution || "Sin institución"} (${account.balance?.toLocaleString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end space-x-3">
               <button
                 type="button"
                 onClick={() => {
                   setIsEditingTransaction(false);
                   setEditingTransaction(null);
-                  setError('');
                 }}
-                className={`flex-1 px-4 py-2 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition-colors cursor-pointer`}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                  darkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                disabled={loading}
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleSaveEditedTransaction}
+                className={`px-4 py-2 rounded-lg font-medium text-sm text-white transition ${
+                  darkMode
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center cursor-pointer"
               >
                 {loading ? (
-                  <>
+                  <span className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     Guardando...
-                  </>
-                ) : "Guardar cambios" }
+                  </span>
+                ) : 'Guardar cambios'}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Modal de confirmación para eliminar transacción */}
-      {showDeleteModal && transactionToDelete && (
-        <div className={`fixed inset-0 flex items-center justify-center z-[110] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/50' : 'backdrop-blur-sm bg-white/50'}`}>
-          <div 
-            ref={deleteModalRef}
-            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6 border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
-          >
-            <div className="text-center mb-6">
-              <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
-                Eliminar transacción
-              </h3>
-              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>
-                ¿Estás seguro de que deseas eliminar esta transacción?
-              </p>
-              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-sm mb-5`}>
-                <strong>{transactionToDelete.descripcion}</strong>
-                <br />
-                {transactionToDelete.tipo === 'ingreso' ? 'Ingreso' : 'Gasto'} de <span className={transactionToDelete.tipo === 'ingreso' ? 'text-green-500' : 'text-red-500'}>${transactionToDelete.monto.toLocaleString()}</span>
-                <br />
-                Esta acción ajustará el saldo de la cuenta asociada y no se puede deshacer.
-              </p>
-              
-              <div className="flex justify-center gap-3">
-                <button 
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setTransactionToDelete(null);
-                  }}
-                  className={`px-4 py-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg flex-1 cursor-pointer`}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={handleDeleteTransaction}
-                  disabled={loading}
-                  className={`px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex-1 flex items-center justify-center ${loading ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Eliminando...
-                    </>
-                  ) : "Eliminar" }
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de confirmación para eliminar múltiples transacciones */}
-      {showDeleteMultipleModal && (
-        <div className={`fixed inset-0 flex items-center justify-center z-[110] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/50' : 'backdrop-blur-sm bg-white/50'}`}>
-          <div 
-            ref={deleteMultipleModalRef}
-            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6 border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
-          >
-            <div className="text-center mb-6">
-              <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </div>
-              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
-                Eliminar transacciones seleccionadas
-              </h3>
-              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>
-                ¿Estás seguro de que deseas eliminar las transacciones seleccionadas?
-              </p>
-              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-sm mb-5`}>
-                Esta acción ajustará el saldo de las cuentas asociadas y no se puede deshacer.
-              </p>
-              
-              <div className="flex justify-center gap-3">
-                <button 
-                  onClick={() => setShowDeleteMultipleModal(false)}
-                  className={`px-4 py-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg flex-1 cursor-pointer`}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={deleteMultipleTransactions}
-                  disabled={loading}
-                  className={`px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex-1 flex items-center justify-center ${loading ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Eliminando...
-                    </>
-                  ) : "Eliminar" }
-                </button>
-              </div>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
+};
