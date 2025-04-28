@@ -78,9 +78,9 @@ export default function DashboardLayout({ children }) {
           </div>
 
           {/* Main content - children are injected here */}
-          <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
+          <main className="flex-1  z-0 overflow-y-auto focus:outline-none">
             <div className="">
-              <div className="">
+              <div className="z-0">
                 {children}
               </div>
             </div>

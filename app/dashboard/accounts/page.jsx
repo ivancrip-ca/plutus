@@ -21,6 +21,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../firebase';
 import { collection, addDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import Link from "next/link";
+// Importar Chart.js y sus componentes
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
+import { Pie, Bar } from 'react-chartjs-2';
+
+// Registramos los componentes necesarios de Chart.js
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
 const PageAccounts = () => {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
@@ -41,6 +47,12 @@ const PageAccounts = () => {
   const [efectivoTransactions, setEfectivoTransactions] = useState([]);
   const [saldoEfectivo, setSaldoEfectivo] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Estado para datos de gráficos
+  const [gastosPorCategoria, setGastosPorCategoria] = useState({});
+  const [ingresosPorCategoria, setIngresosPorCategoria] = useState({});
+  const [datosIngresoVsGasto, setDatosIngresoVsGasto] = useState({});
+  const [tipoGrafica, setTipoGrafica] = useState('gastos'); // 'gastos' o 'ingresos'
   
   // Modal de confirmación para eliminar cuenta
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -317,9 +329,89 @@ const PageAccounts = () => {
       
       setSaldoEfectivo(ingresosEfectivo - gastosEfectivo);
       
+      // Procesar datos para gráficas
+      processChartData(transactionsData);
+      
     } catch (error) {
       console.error('Error al obtener las transacciones del usuario:', error);
     }
+  };
+  
+  // Función para procesar datos para las gráficas
+  const processChartData = (transactions) => {
+    // Procesamiento para la gráfica de distribución de gastos por categoría
+    const gastosPorCategoriaObj = {};
+    const ingresosPorCategoriaObj = {};
+    
+    // Filtrar transacciones de tipo gasto e ingreso
+    const gastosTransactions = transactions.filter(t => t.tipo === 'gasto');
+    const ingresosTransactions = transactions.filter(t => t.tipo === 'ingreso');
+    
+    // Agrupar gastos por categoría y sumar montos
+    gastosTransactions.forEach(transaction => {
+      const categoria = transaction.categoria || 'Sin categoría';
+      const monto = Number(transaction.monto) || 0;
+      
+      if (gastosPorCategoriaObj[categoria]) {
+        gastosPorCategoriaObj[categoria] += monto;
+      } else {
+        gastosPorCategoriaObj[categoria] = monto;
+      }
+    });
+    
+    // Agrupar ingresos por categoría y sumar montos
+    ingresosTransactions.forEach(transaction => {
+      const categoria = transaction.categoria || 'Sin categoría';
+      const monto = Number(transaction.monto) || 0;
+      
+      if (ingresosPorCategoriaObj[categoria]) {
+        ingresosPorCategoriaObj[categoria] += monto;
+      } else {
+        ingresosPorCategoriaObj[categoria] = monto;
+      }
+    });
+    
+    setGastosPorCategoria(gastosPorCategoriaObj);
+    setIngresosPorCategoria(ingresosPorCategoriaObj);
+    
+    // Procesamiento para la gráfica de ingresos vs gastos (por mes)
+    const últimos6Meses = [];
+    const hoy = new Date();
+    
+    // Generar array con los últimos 6 meses
+    for (let i = 5; i >= 0; i--) {
+      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+      const añoMes = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      const nombreMes = fecha.toLocaleString('es-ES', { month: 'short' });
+      
+      últimos6Meses.push({
+        añoMes,
+        nombreMes,
+        ingresos: 0,
+        gastos: 0
+      });
+    }
+    
+    // Agrupar transacciones por mes
+    transactions.forEach(transaction => {
+      if (!transaction.fecha) return;
+      
+      const fechaTransaccion = new Date(transaction.fecha);
+      const añoMesTransaccion = `${fechaTransaccion.getFullYear()}-${String(fechaTransaccion.getMonth() + 1).padStart(2, '0')}`;
+      
+      const mesIndex = últimos6Meses.findIndex(m => m.añoMes === añoMesTransaccion);
+      if (mesIndex === -1) return; // No está en los últimos 6 meses
+      
+      const monto = Number(transaction.monto) || 0;
+      
+      if (transaction.tipo === 'ingreso') {
+        últimos6Meses[mesIndex].ingresos += monto;
+      } else if (transaction.tipo === 'gasto') {
+        últimos6Meses[mesIndex].gastos += monto;
+      }
+    });
+    
+    setDatosIngresoVsGasto(últimos6Meses);
   };
   
   // Función para manejar cambios en el formulario
@@ -1034,29 +1126,165 @@ const PageAccounts = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} rounded-xl shadow-sm border p-4`}>
           <div className="flex justify-between items-center mb-4">
-            <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Distribución de Gastos</h3>
-            <button className={`${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}>
-              <MoreVertical className="h-5 w-5" />
-            </button>
+            <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Distribución por categoría</h3>
+            <div className="flex items-center space-x-1">
+              <button 
+                onClick={() => setTipoGrafica('gastos')}
+                className={`px-3 py-1 text-xs font-medium rounded-md ${
+                  tipoGrafica === 'gastos' 
+                    ? darkMode 
+                      ? 'bg-red-900/20 text-red-400 border border-red-800/30' 
+                      : 'bg-red-50 text-red-700 border border-red-100 ' 
+                    : darkMode 
+                      ? 'bg-gray-700 text-gray-400 hover:bg-gray-600' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Gastos
+              </button>
+              <button 
+                onClick={() => setTipoGrafica('ingresos')}
+                className={`px-3 py-1 text-xs font-medium rounded-md ${
+                  tipoGrafica === 'ingresos' 
+                    ? darkMode 
+                      ? 'bg-green-900/20 text-green-400 border border-green-800/30' 
+                      : 'bg-green-50 text-green-700 border border-green-100' 
+                    : darkMode 
+                      ? 'bg-gray-700 text-gray-400 hover:bg-gray-600' 
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Ingresos
+              </button>
+            </div>
           </div>
-          {userAccounts.length > 0 ? (
-            <div className="flex flex-col items-center justify-center h-60">
-              <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
-                <PieChart className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+          
+          {tipoGrafica === 'gastos' ? (
+            // Gráfica de gastos
+            Object.keys(gastosPorCategoria).length > 0 ? (
+              <div className="h-60">
+                <Pie 
+                  data={{
+                    labels: Object.keys(gastosPorCategoria),
+                    datasets: [
+                      {
+                        data: Object.values(gastosPorCategoria),
+                        backgroundColor: [
+                          '#EF4444', '#F59E0B', '#8B5CF6', '#EC4899', 
+                          '#F97316', '#14B8A6', '#6366F1', '#84CC16'
+                        ],
+                        borderWidth: 1,
+                        borderColor: darkMode ? '#111827' : '#ffffff',
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'right',
+                        labels: {
+                          color: darkMode ? '#ffffff' : '#111827',
+                          usePointStyle: true,
+                          boxWidth: 10
+                        }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: (context) => {
+                            const value = context.raw;
+                            const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${context.label}: $${value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${percentage}%)`;
+                          }
+                        }
+                      },
+                      title: {
+                        display: true,
+                        text: 'Distribución de gastos',
+                        color: darkMode ? '#ffffff' : '#111827',
+                        font: {
+                          size: 14
+                        }
+                      }
+                    }
+                  }}
+                />
               </div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
-                Aún no hay datos suficientes para mostrar la distribución de gastos.
-              </p>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-60">
+                <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
+                  <PieChart className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                </div>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
+                  Aún no hay datos suficientes para mostrar la distribución de gastos.
+                </p>
+              </div>
+            )
           ) : (
-            <div className="flex flex-col items-center justify-center h-60">
-              <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
-                <CreditCard className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+            // Gráfica de ingresos
+            Object.keys(ingresosPorCategoria).length > 0 ? (
+              <div className="h-60">
+                <Pie 
+                  data={{
+                    labels: Object.keys(ingresosPorCategoria),
+                    datasets: [
+                      {
+                        data: Object.values(ingresosPorCategoria),
+                        backgroundColor: [
+                          '#10B981', '#0EA5E9', '#4F46E5', '#A855F7',
+                          '#0891B2', '#059669', '#7C3AED', '#2563EB'
+                        ],
+                        borderWidth: 1,
+                        borderColor: darkMode ? '#111827' : '#ffffff',
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'right',
+                        labels: {
+                          color: darkMode ? '#ffffff' : '#111827',
+                          usePointStyle: true,
+                          boxWidth: 10
+                        }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: (context) => {
+                            const value = context.raw;
+                            const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${context.label}: $${value.toLocaleString('es-ES')} (${percentage}%)`;
+                          }
+                        }
+                      },
+                      title: {
+                        display: true,
+                        text: 'Distribución de ingresos',
+                        color: darkMode ? '#ffffff' : '#111827',
+                        font: {
+                          size: 14
+                        }
+                      }
+                    }
+                  }}
+                />
               </div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
-                Agrega una cuenta para comenzar a visualizar tu distribución de gastos.
-              </p>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-60">
+                <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
+                  <PieChart className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                </div>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
+                  Aún no hay datos suficientes para mostrar la distribución de ingresos.
+                </p>
+              </div>
+            )
           )}
         </div>
         
@@ -1067,22 +1295,84 @@ const PageAccounts = () => {
               <MoreVertical className="h-5 w-5" />
             </button>
           </div>
-          {userAccounts.length > 0 ? (
+          {datosIngresoVsGasto.length > 0 && datosIngresoVsGasto.some(mes => mes.ingresos > 0 || mes.gastos > 0) ? (
+            <div className="h-60">
+              <Bar 
+                data={{
+                  labels: datosIngresoVsGasto.map(mes => mes.nombreMes),
+                  datasets: [
+                    {
+                      label: 'Ingresos',
+                      data: datosIngresoVsGasto.map(mes => mes.ingresos),
+                      backgroundColor: '#10B981',
+                      borderColor: '#10B981',
+                      borderWidth: 1,
+                    },
+                    {
+                      label: 'Gastos',
+                      data: datosIngresoVsGasto.map(mes => mes.gastos),
+                      backgroundColor: '#EF4444',
+                      borderColor: '#EF4444',
+                      borderWidth: 1,
+                    }
+                  ]
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        color: darkMode ? '#ffffff' : '#111827',
+                        usePointStyle: true,
+                        boxWidth: 10
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (context) => {
+                          const value = context.raw;
+                          return `${context.dataset.label}: $${value.toLocaleString('es-ES')}`;
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    x: {
+                      ticks: {
+                        color: darkMode ? '#9CA3AF' : '#4B5563'
+                      },
+                      grid: {
+                        color: darkMode ? '#374151' : '#E5E7EB',
+                        display: false
+                      }
+                    },
+                    y: {
+                      ticks: {
+                        color: darkMode ? '#9CA3AF' : '#4B5563',
+                        callback: function(value) {
+                          if (value >= 1000) {
+                            return '$' + value / 1000 + 'k';
+                          }
+                          return '$' + value;
+                        }
+                      },
+                      grid: {
+                        color: darkMode ? '#374151' : '#E5E7EB'
+                      }
+                    }
+                  }
+                }}
+              />
+            </div>
+          ) : (
             <div className="flex flex-col items-center justify-center h-60">
               <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
                 <BarChart4 className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
               </div>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
                 Registra tus ingresos y gastos para ver comparativas en esta sección.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-60">
-              <div className={`h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} flex items-center justify-center mb-4`}>
-                <CreditCard className={`h-8 w-8 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-              </div>
-              <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center max-w-md`}>
-                Agrega una cuenta para comenzar a visualizar tus ingresos y gastos.
               </p>
             </div>
           )}
@@ -1492,14 +1782,14 @@ const PageAccounts = () => {
                     setEfectivoError('');
                     setEfectivoSuccess('');
                   }}
-                  className={`px-4 py-2 cursor-pointer ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
+                  className={`px-4 py-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
                   disabled={updateEfectivoLoading}
-                  className={`px-4 py-2 cursor-pointer bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center ${updateEfectivoLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center ${updateEfectivoLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
                   {updateEfectivoLoading ? (
                     <>
@@ -1510,7 +1800,7 @@ const PageAccounts = () => {
                       Guardando...
                     </>
                   ) : "Guardar" }
-                </button>
+                </button> 
               </div>
             </form>
           </div>
@@ -1518,6 +1808,6 @@ const PageAccounts = () => {
       )}
     </div>
   );
-}
+};
 
 export default PageAccounts;

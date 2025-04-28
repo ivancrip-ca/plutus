@@ -3,94 +3,334 @@
 import { useState, useEffect } from 'react';
 import { MdAdd, MdEdit, MdDelete, MdWarning, MdArrowUpward, MdArrowDownward } from 'react-icons/md';
 import { useTheme } from '../../../app/contexts/ThemeContext';
+import { useAuth } from '../../../app/contexts/AuthContext';
+import { db } from '../../../app/firebase';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Pie } from 'react-chartjs-2';
+
+// Registrar los componentes necesarios de Chart.js
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const BudgetPage = () => {
   const { darkMode } = useTheme();
+  const { currentUser } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingBudget, setEditingBudget] = useState(null);
   const [activeTab, setActiveTab] = useState('activos');
-  const [sortConfig, setSortConfig] = useState({ key: 'category', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'category ', direction: 'asc' });
+  const [isLoading, setIsLoading] = useState(false);
+  const [budgets, setBudgets] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState(null);
+
+  const [formData, setFormData] = useState({
+    category: '',
+    limit: '',
+    period: 'Mensual',
+    startDate: '',
+    endDate: '',
+    description: '',
+    color: 'bg-blue-500',
+    status: 'activo'
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [modalContentRef, setModalContentRef] = useState(null);
+
+  // Función para manejar los cambios en el formulario
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+
+    // Si el campo es limit, formatear el valor
+    if (name === 'limit') {
+      // Eliminar cualquier carácter que no sea número o punto decimal
+      const numericValue = value.replace(/[^\d.]/g, '');
+
+      setFormData({
+        ...formData,
+        [name]: numericValue
+      });
+      return;
+    }
+
+    // Para otros campos, comportamiento normal
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
+
+  // Función para manejar clic en el backdrop del modal
+  const handleModalBackdropClick = (e) => {
+    // Solo cerrar si el clic fue directamente en el backdrop, no en el contenido
+    if (modalContentRef && !modalContentRef.contains(e.target)) {
+      closeModal();
+    }
+  };
+
+  // Función para cerrar el modal
+  const closeModal = () => {
+    setShowAddModal(false);
+    setEditingBudget(null);
+    setError('');
+    setSuccessMessage('');
+    // Resetear el formulario
+    setFormData({
+      category: '',
+      limit: '',
+      period: 'Mensual',
+      startDate: '',
+      endDate: '',
+      description: '',
+      color: 'bg-blue-500',
+      status: 'activo'
+    });
+  };
+
+  // Función para crear un nuevo presupuesto
+  const handleAddBudget = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    setLoading(true);
+    
+    try {
+      if (!currentUser) {
+        throw new Error('Debes iniciar sesión para crear un presupuesto');
+      }
+      
+      // Validar campos del formulario
+      if (!formData.category.trim()) {
+        throw new Error('La categoría es obligatoria');
+      }
+      
+      if (!formData.limit.trim() || isNaN(Number(formData.limit))) {
+        throw new Error('El límite debe ser un número válido');
+      }
+      
+      if (!formData.startDate.trim()) {
+        throw new Error('La fecha de inicio es obligatoria');
+      }
+      
+      if (!formData.endDate.trim()) {
+        throw new Error('La fecha de fin es obligatoria');
+      }
+      
+      // Verificar que la fecha de fin sea mayor que la de inicio
+      if (new Date(formData.startDate) >= new Date(formData.endDate)) {
+        throw new Error('La fecha de fin debe ser posterior a la fecha de inicio');
+      }
+      
+      // Crear el objeto del presupuesto para Firestore
+      const newBudget = {
+        userId: currentUser.uid,
+        category: formData.category,
+        spent: 0, // Comienza en 0
+        limit: Number(formData.limit),
+        color: formData.color,
+        period: formData.period,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        description: formData.description,
+        status: formData.status,
+        createdAt: serverTimestamp()
+      };
+      
+      // Guardar en Firestore
+      const docRef = await addDoc(collection(db, 'budgets'), newBudget);
+      console.log('Presupuesto creado con ID:', docRef.id);
+      
+      // Actualizar la lista de presupuestos
+      await fetchBudgets();
+      
+      // Mostrar mensaje de éxito
+      setSuccessMessage('Presupuesto creado correctamente');
+      
+      // Cerrar modal después de un breve momento
+      setTimeout(() => {
+        closeModal();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error al crear presupuesto:', error);
+      setError(error.message || 'Error al crear el presupuesto');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para actualizar un presupuesto existente
+  const handleUpdateBudget = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+    setLoading(true);
+    
+    try {
+      if (!currentUser || !editingBudget) {
+        throw new Error('Debes iniciar sesión para actualizar un presupuesto');
+      }
+      
+      // Las mismas validaciones que en la creación
+      if (!formData.category.trim()) {
+        throw new Error('La categoría es obligatoria');
+      }
+      
+      if (!formData.limit.trim() || isNaN(Number(formData.limit))) {
+        throw new Error('El límite debe ser un número válido');
+      }
+      
+      if (!formData.startDate.trim()) {
+        throw new Error('La fecha de inicio es obligatoria');
+      }
+      
+      if (!formData.endDate.trim()) {
+        throw new Error('La fecha de fin es obligatoria');
+      }
+      
+      if (new Date(formData.startDate) >= new Date(formData.endDate)) {
+        throw new Error('La fecha de fin debe ser posterior a la fecha de inicio');
+      }
+      
+      // Validar que el valor de spent sea un número válido
+      if (isNaN(Number(formData.spent))) {
+        throw new Error('La cantidad gastada debe ser un número válido');
+      }
+      
+      // Crear el objeto de presupuesto actualizado
+      const updatedBudget = {
+        category: formData.category,
+        limit: Number(formData.limit),
+        spent: Number(formData.spent), // Actualizar el valor de spent
+        color: formData.color,
+        period: formData.period,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        description: formData.description,
+        status: formData.status,
+        updatedAt: serverTimestamp()
+      };
+      
+      // Actualizar en Firestore
+      await updateDoc(doc(db, 'budgets', editingBudget.id), updatedBudget);
+      
+      // Actualizar la lista de presupuestos
+      await fetchBudgets();
+      
+      // Mostrar mensaje de éxito
+      setSuccessMessage('Presupuesto actualizado correctamente');
+      
+      // Cerrar modal después de un breve momento
+      setTimeout(() => {
+        closeModal();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error al actualizar presupuesto:', error);
+      setError(error.message || 'Error al actualizar el presupuesto');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para obtener presupuestos desde Firestore
+  const fetchBudgets = async () => {
+    try {
+      setIsLoading(true);
+      if (!currentUser) return;
+      
+      const budgetsQuery = query(
+        collection(db, 'budgets'),
+        where('userId', '==', currentUser.uid)
+      );
+      
+      const querySnapshot = await getDocs(budgetsQuery);
+      const budgetsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('Presupuestos obtenidos:', budgetsData);
+      setBudgets(budgetsData);
+    } catch (error) {
+      console.error('Error al obtener los presupuestos:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Función para mostrar modal de confirmación para eliminar presupuesto
+  const showDeleteConfirmation = (budget) => {
+    setBudgetToDelete(budget);
+    setShowDeleteModal(true);
+  };
+
+  // Función para eliminar un presupuesto
+  const handleDeleteBudget = async () => {
+    if (!budgetToDelete || !currentUser) return;
+    
+    try {
+      setLoading(true);
+      
+      // Eliminar el presupuesto de Firestore
+      await deleteDoc(doc(db, 'budgets', budgetToDelete.id));
+      
+      // Actualizar la lista de presupuestos
+      await fetchBudgets();
+      
+      // Cerrar modal de confirmación
+      setShowDeleteModal(false);
+      setBudgetToDelete(null);
+      
+      // Mostrar mensaje de éxito
+      setSuccessMessage('Presupuesto eliminado correctamente');
+      
+      // Limpiar el mensaje después de un tiempo
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error al eliminar el presupuesto:', error);
+      setError('No se pudo eliminar el presupuesto. Inténtalo de nuevo.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar los datos del presupuesto a editar cuando cambia editingBudget
+  useEffect(() => {
+    if (editingBudget) {
+      setFormData({
+        category: editingBudget.category,
+        limit: editingBudget.limit.toString(),
+        period: editingBudget.period,
+        startDate: editingBudget.startDate,
+        endDate: editingBudget.endDate,
+        description: editingBudget.description,
+        color: editingBudget.color,
+        status: editingBudget.status,
+        spent: editingBudget.spent.toString() // Añadir el valor de gasto actual
+      });
+    } else {
+      // Cuando se crea un nuevo presupuesto, asegurar que spent esté en 0
+      setFormData(prevFormData => ({
+        ...prevFormData,
+        spent: '0'
+      }));
+    }
+  }, [editingBudget]);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  // Datos de ejemplo para presupuestos
-  const [budgets, setBudgets] = useState([
-    { 
-      id: 1, 
-      category: 'Alimentación', 
-      spent: 450, 
-      limit: 600, 
-      color: 'bg-blue-500',
-      period: 'Mensual',
-      startDate: '2025-04-01',
-      endDate: '2025-04-30',
-      description: 'Incluye supermercados y comida para llevar',
-      status: 'activo'
-    },
-    { 
-      id: 2, 
-      category: 'Transporte', 
-      spent: 120, 
-      limit: 200, 
-      color: 'bg-green-500',
-      period: 'Mensual',
-      startDate: '2025-04-01',
-      endDate: '2025-04-30',
-      description: 'Gasolina, transporte público y taxis',
-      status: 'activo'
-    },
-    { 
-      id: 3, 
-      category: 'Entretenimiento', 
-      spent: 180, 
-      limit: 150, 
-      color: 'bg-red-500',
-      period: 'Mensual',
-      startDate: '2025-04-01',
-      endDate: '2025-04-30',
-      description: 'Cine, conciertos y eventos',
-      status: 'activo'
-    },
-    { 
-      id: 4, 
-      category: 'Salud', 
-      spent: 75, 
-      limit: 300, 
-      color: 'bg-purple-500',
-      period: 'Mensual',
-      startDate: '2025-04-01',
-      endDate: '2025-04-30',
-      description: 'Medicamentos y consultas médicas',
-      status: 'activo'
-    },
-    { 
-      id: 5, 
-      category: 'Servicios', 
-      spent: 320, 
-      limit: 350, 
-      color: 'bg-yellow-500',
-      period: 'Mensual',
-      startDate: '2025-04-01',
-      endDate: '2025-04-30',
-      description: 'Agua, luz, internet, teléfono',
-      status: 'activo'
-    },
-    { 
-      id: 6, 
-      category: 'Educación', 
-      spent: 0, 
-      limit: 500, 
-      color: 'bg-indigo-500',
-      period: 'Mensual',
-      startDate: '2025-04-01',
-      endDate: '2025-04-30',
-      description: 'Cursos, libros y material educativo',
-      status: 'inactivo'
-    },
-  ]);
+    if (currentUser) {
+      fetchBudgets();
+    }
+  }, [currentUser]);
 
   // Función para calcular el porcentaje de progreso
   const calculateProgress = (spent, limit) => {
@@ -108,10 +348,10 @@ const BudgetPage = () => {
   // Función para obtener mensaje de estado
   const getStatusMessage = (spent, limit) => {
     const percentage = (spent / limit) * 100;
-    if (percentage > 100) return 'Has superado tu presupuesto';
-    if (percentage > 75) return 'Estás cerca del límite';
-    if (percentage > 50) return 'Vas por buen camino';
-    return 'Excelente manejo';
+    if (percentage > 100) return 'Excedido';
+    if (percentage > 75) return 'Cerca del límite';
+    if (percentage > 50) return 'Buen camino';
+    return 'Excelente';
   };
 
   // Función para ordenar los presupuestos
@@ -219,37 +459,99 @@ const BudgetPage = () => {
 
       {/* Gráfico y panel de detalles */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Gráfico de distribución - Aquí iría la implementación del gráfico */}
+        {/* Gráfico de distribución de presupuestos (Gráfica de pastel) */}
         <div className={`col-span-1 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} border rounded-xl p-6 shadow-sm`}>
-          <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Distribución de Presupuestos</h3>
+          <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'} mb-4`}>Distribución de presupuestos</h3>
           
-          <div className="h-64 flex flex-col justify-center items-center">
-            <div className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-              <p className="mb-2">Distribución de tus presupuestos por categoría</p>
-              <p className="text-xs">El gráfico mostraría la distribución visual de los presupuestos</p>
+          {chartData.length > 0 ? (
+            <div className="h-64">
+              <Pie 
+                data={{
+                  labels: chartData.map(budget => budget.category),
+                  datasets: [
+                    {
+                      data: chartData.map(budget => budget.limit),
+                      backgroundColor: chartData.map(budget => {
+                        // Convertir clases de Tailwind a colores HEX para Chart.js
+                        const colorMap = {
+                          'bg-blue-500': '#3B82F6',
+                          'bg-green-500': '#10B981', 
+                          'bg-purple-500': '#8B5CF6',
+                          'bg-red-500': '#EF4444',
+                          'bg-yellow-500': '#F59E0B',
+                          'bg-pink-500': '#EC4899',
+                          'bg-indigo-500': '#6366F1',
+                          'bg-teal-500': '#14B8A6',
+                          'bg-orange-500': '#F97316',
+                          'bg-gray-500': '#6B7280'
+                        };
+                        return colorMap[budget.color] || '#3B82F6';
+                      }),
+                      borderWidth: 1,
+                      borderColor: darkMode ? '#111827' : '#ffffff',
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'right',
+                      labels: {
+                        color: darkMode ? '#ffffff' : '#111827',
+                        usePointStyle: true,
+                        boxWidth: 10,
+                        font: {
+                          size: 11
+                        }
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (context) => {
+                          const value = context.raw;
+                          const total = context.dataset.data.reduce((acc, val) => acc + val, 0);
+                          const percentage = ((value / total) * 100).toFixed(1);
+                          return `${context.label}: $${value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${percentage}%)`;
+                        }
+                      }
+                    }
+                  }
+                }}
+              />
             </div>
-          </div>
+          ) : (
+            <div className="h-64 flex flex-col justify-center items-center">
+              <div className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className="mb-2">No hay presupuestos activos para mostrar</p>
+                <p className="text-xs">Crea presupuestos para visualizar su distribución</p>
+              </div>
+            </div>
+          )}
           
-          <div className="mt-4">
-            <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>Leyenda</h4>
-            <div className="space-y-2">
-              {chartData.map((item) => (
-                <div key={item.category} className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full ${item.color} mr-2`}></div>
-                  <span className="text-xs flex-1">{item.category}</span>
-                  <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    ${item.spent.toLocaleString('es-ES')} / ${item.limit.toLocaleString('es-ES')}
-                  </span>
-                </div>
-              ))}
+          {chartData.length > 0 && (
+            <div className="mt-4">
+              <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>Leyenda</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {chartData.map((item) => (
+                  <div key={item.category} className="flex items-center">
+                    <div className={`w-3 h-3 rounded-full ${item.color} mr-2`}></div>
+                    <span className="text-xs flex-1">{item.category}</span>
+                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      ${item.spent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / ${item.limit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
         
         {/* Panel detallado de presupuestos */}
         <div className={`col-span-1 md:col-span-2 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} border rounded-xl p-6 shadow-sm`}>
           <div className="flex justify-between items-center mb-6">
-            <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Detalle de Presupuestos</h3>
+            <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Detalle de presupuestos</h3>
             <button
               onClick={() => {
                 setEditingBudget(null);
@@ -260,7 +562,7 @@ const BudgetPage = () => {
                   ? 'bg-cyan-700 text-white hover:bg-cyan-600' 
                   : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
             >
-              <MdAdd className="mr-1" /> Nuevo Presupuesto
+              <MdAdd className="mr-1" /> Nuevo presupuesto
             </button>
           </div>
           
@@ -348,14 +650,14 @@ const BudgetPage = () => {
                       </div>
                     </td>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      ${budget.limit.toLocaleString('es-ES')}
+                      ${budget.limit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                     </td>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm ${
                       budget.spent > budget.limit 
                         ? 'text-red-500' 
                         : darkMode ? 'text-gray-300' : 'text-gray-500'
                     }`}>
-                      ${budget.spent.toLocaleString('es-ES')}
+                      ${budget.spent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       {budget.spent > budget.limit && (
                         <MdWarning className="inline ml-1 text-red-500" />
                       )}
@@ -394,6 +696,7 @@ const BudgetPage = () => {
                           <MdEdit className="h-5 w-5" />
                         </button>
                         <button 
+                          onClick={() => showDeleteConfirmation(budget)}
                           className={`p-1 rounded-full ${
                             darkMode 
                               ? 'text-gray-300 hover:text-red-400 hover:bg-gray-600' 
@@ -461,47 +764,325 @@ const BudgetPage = () => {
         </div>
       </div>
 
-      {/* Modal para añadir/editar presupuesto (simplificado para este ejemplo) */}
+      {/* Modal para añadir/editar presupuesto - Formulario profesional completo */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
-          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setShowAddModal(false)}></div>
-          <div className={`relative w-full max-w-md p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-            <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {editingBudget ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
-            </h3>
-            <div className="space-y-4">
-              <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                Esta sería una forma completa para {editingBudget ? 'editar el' : 'añadir un nuevo'} presupuesto.
-                En una implementación completa, incluiría campos para:
-              </p>
-              <ul className={`text-sm list-disc ml-5 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                <li>Categoría</li>
-                <li>Límite de presupuesto</li>
-                <li>Periodo (mensual, semanal, etc.)</li>
-                <li>Fechas de inicio y fin</li>
-                <li>Color</li>
-                <li>Descripción</li>
-                <li>Estado</li>
-              </ul>
-              <div className="flex justify-end space-x-3 pt-4">
+        <div 
+          className={`fixed inset-0 flex items-center justify-center z-[100] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/30' : 'backdrop-blur-sm bg-white/30'}`}
+          onClick={handleModalBackdropClick}
+        >
+          <div 
+            ref={setModalContentRef}
+            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6`}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                {editingBudget ? "Editar presupuesto" : "Crear nuevo presupuesto"}
+              </h2>
+              <button 
+                onClick={closeModal} 
+                className={`cursor-pointer ${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={editingBudget ? handleUpdateBudget : handleAddBudget}>
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg dark:bg-red-900/30 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+              
+              {successMessage && (
+                <div className="mb-4 p-3 bg-green-50 text-green-700 text-sm rounded-lg dark:bg-green-900/30 dark:text-green-400">
+                  {successMessage}
+                </div>
+              )}
+              
+              <div className="space-y-4 mb-6">
+                {/* Categoría */}
+                <div>
+                  <label htmlFor="category" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Categoría
+                  </label>
+                  <input
+                    type="text"
+                    id="category"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleInputChange}
+                    placeholder="Ej. Alimentación, Transporte, Entretenimiento"
+                    className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                    required
+                  />
+                </div>
+                
+                {/* Límite de presupuesto */}
+                <div>
+                  <label htmlFor="limit" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Límite de presupuesto
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                    </div>
+                    <input
+                      type="text"
+                      id="limit"
+                      name="limit"
+                      value={formData.limit}
+                      onChange={handleInputChange}
+                      placeholder="0.00"
+                      className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                      required
+                    />
+                  </div>
+                  <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Cantidad máxima que planeas gastar en esta categoría
+                  </p>
+                </div>
+                
+                {/* Cantidad gastada - Solo visible al editar */}
+                {editingBudget && (
+                  <div>
+                    <label htmlFor="spent" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Cantidad gastada
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                      </div>
+                      <input
+                        type="text"
+                        id="spent"
+                        name="spent"
+                        value={formData.spent}
+                        onChange={handleInputChange}
+                        placeholder="0.00"
+                        className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                      />
+                    </div>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Cantidad actual gastada en esta categoría (afecta al progreso de la barra)
+                    </p>
+                  </div>
+                )}
+                
+                {/* Periodo del presupuesto */}
+                <div>
+                  <label htmlFor="period" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Periodo
+                  </label>
+                  <select
+                    id="period"
+                    name="period"
+                    value={formData.period}
+                    onChange={handleInputChange}
+                    className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  >
+                    <option value="Mensual">Mensual</option>
+                    <option value="Semanal">Semanal</option>
+                    <option value="Quincenal">Quincenal</option>
+                    <option value="Trimestral">Trimestral</option>
+                    <option value="Anual">Anual</option>
+                  </select>
+                </div>
+                
+                {/* Fechas de inicio y fin */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="startDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Fecha de inicio
+                    </label>
+                    <input
+                      type="date"
+                      id="startDate"
+                      name="startDate"
+                      value={formData.startDate}
+                      onChange={handleInputChange}
+                      className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="endDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Fecha de fin
+                    </label>
+                    <input
+                      type="date"
+                      id="endDate"
+                      name="endDate"
+                      value={formData.endDate}
+                      onChange={handleInputChange}
+                      className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                {/* Descripción */}
+                <div>
+                  <label htmlFor="description" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Descripción (opcional)
+                  </label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    rows="2"
+                    placeholder="Detalles o notas sobre este presupuesto"
+                    className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  ></textarea>
+                </div>
+                
+                {/* Color del presupuesto */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Color
+                  </label>
+                  <div className="grid grid-cols-5 gap-2 mt-1">
+                    {['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 
+                      'bg-pink-500', 'bg-indigo-500', 'bg-teal-500', 'bg-orange-500', 'bg-gray-500'].map((color) => (
+                      <div 
+                        key={color}
+                        className={`h-8 w-8 rounded-full cursor-pointer ${color} transition-transform ${
+                          formData.color === color ? 'ring-2 ring-offset-2 ring-cyan-600 scale-110' : ''
+                        }`}
+                        onClick={() => {
+                          setFormData({...formData, color: color});
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Estado del presupuesto */}
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Estado
+                  </label>
+                  <div className="flex space-x-4">
+                    <div 
+                      className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer flex-1 ${
+                        formData.status === 'activo' 
+                          ? `bg-green-50 border-green-500 ${darkMode ? 'bg-green-900 bg-opacity-20' : ''}` 
+                          : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => setFormData({...formData, status: 'activo'})}
+                    >
+                      <div className={`h-4 w-4 rounded-full ${formData.status === 'activo' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                      <span className={`text-sm ${formData.status === 'activo' ? (darkMode ? 'text-green-400' : 'text-green-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                        Activo
+                      </span>
+                    </div>
+                    <div 
+                      className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer flex-1 ${
+                        formData.status === 'inactivo' 
+                          ? `bg-red-50 border-red-500 ${darkMode ? 'bg-red-900 bg-opacity-20' : ''}` 
+                          : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => setFormData({...formData, status: 'inactivo'})}
+                    >
+                      <div className={`h-4 w-4 rounded-full ${formData.status === 'inactivo' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                      <span className={`text-sm ${formData.status === 'inactivo' ? (darkMode ? 'text-red-400' : 'text-red-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                        Inactivo
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3">
                 <button 
-                  onClick={() => setShowAddModal(false)}
-                  className={`px-4 py-2 rounded ${
-                    darkMode 
-                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+                  type="button"
+                  onClick={closeModal}
+                  className={`px-4 py-2 cursor-pointer ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
                 >
                   Cancelar
                 </button>
                 <button 
-                  className={`px-4 py-2 rounded ${
-                    darkMode 
-                      ? 'bg-cyan-700 text-white hover:bg-cyan-600' 
-                      : 'bg-cyan-600 text-white hover:bg-cyan-700'
-                  }`}
+                  type="submit"
+                  disabled={loading}
+                  className={`px-4 py-2 cursor-pointer bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 flex items-center ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
-                  {editingBudget ? 'Guardar Cambios' : 'Crear Presupuesto'}
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {editingBudget ? "Actualizando..." : "Creando..."}
+                    </>
+                  ) : editingBudget ? "Guardar Cambios" : "Crear Presupuesto" }
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación para eliminar presupuesto */}
+      {showDeleteModal && (
+        <div 
+          className={`fixed inset-0 flex items-center justify-center z-[110] p-4 pointer-events-auto ${darkMode ? 'backdrop-blur-sm bg-black/50' : 'backdrop-blur-sm bg-white/50'}`}
+          onClick={(e) => {
+            // Cerrar el modal al hacer clic fuera de su contenido
+            if (e.target === e.currentTarget) {
+              setShowDeleteModal(false);
+              setBudgetToDelete(null);
+            }
+          }}
+        >
+          <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6 border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className="text-center mb-6">
+              <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+                Eliminar presupuesto
+              </h3>
+              <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-1`}>
+                ¿Estás seguro de que deseas eliminar este presupuesto?
+              </p>
+              <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-sm mb-5`}>
+                <strong>{budgetToDelete?.category}</strong>
+                <br />
+                Esta acción no se puede deshacer.
+              </p>
+              
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg dark:bg-red-900/30 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+              
+              <div className="flex justify-center gap-3">
+                <button 
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setBudgetToDelete(null);
+                  }}
+                  className={`px-4 py-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg flex-1`}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={handleDeleteBudget}
+                  disabled={loading}
+                  className={`px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex-1 flex items-center justify-center ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Eliminando...
+                    </>
+                  ) : "Eliminar" }
                 </button>
               </div>
             </div>

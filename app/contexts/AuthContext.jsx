@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -57,10 +57,28 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  // Función para actualizar los datos del usuario en el contexto
+  const updateUserData = (newData) => {
+    setUserData(newData);
+  };
+
+  // Función para cerrar sesión
+  const signOutUser = async () => {
+    try {
+      await signOut(auth);
+      router.push('/'); // Redireccionar a la página de inicio
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+      throw error;
+    }
+  };
+
   // Valor que proporcionará el contexto
   const value = {
     currentUser,
     userData,
+    updateUserData,
+    logout: signOutUser, // Exponer función de logout
     isAuthenticated: !!currentUser,
     loading
   };

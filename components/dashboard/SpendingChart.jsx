@@ -12,6 +12,14 @@ const SpendingChart = ({ data }) => {
     setMounted(true);
   }, []);
 
+  // Función para formatear números con formato miles,decimales
+  const formatNumber = (value) => {
+    return value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   useEffect(() => {
     if (chartRef.current && data && mounted) {
       // Destruir el gráfico anterior si existe
@@ -61,7 +69,7 @@ const SpendingChart = ({ data }) => {
                   const value = context.raw || 0;
                   const total = context.dataset.data.reduce((a, b) => a + b, 0);
                   const percentage = Math.round((value / total) * 100);
-                  return `${label}: $${value.toLocaleString('es-ES')} (${percentage}%)`;
+                  return `${label}: $${formatNumber(value)} (${percentage}%)`;
                 }
               }
             }
@@ -92,7 +100,7 @@ const SpendingChart = ({ data }) => {
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
         <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total</p>
         <p className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          ${totalSpending.toLocaleString('es-ES')}
+          ${formatNumber(totalSpending)}
         </p>
       </div>
     </div>

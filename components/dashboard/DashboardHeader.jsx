@@ -1,17 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { MdMenu, MdNotifications, MdAdd, MdSearch, MdLightMode, MdDarkMode } from 'react-icons/md';
+import React, { useState, useEffect, useRef } from 'react';
+import { MdMenu, MdNotifications, MdAdd, MdSearch, MdLightMode, MdDarkMode, MdCreditCard, MdAttachMoney } from 'react-icons/md';
 import Image from 'next/image';
 import { useTheme } from '../../app/contexts/ThemeContext';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+// Añadimos estilos globales para la animación y el menú
+const styles = {
+  addMenuContainer: {
+    position: 'relative'
+  },
+  addMenuDropdown: {
+    position: 'absolute',
+    animation: 'fadeIn 0.2s ease-out',
+    zIndex: 9999, // Valor extremadamente alto
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+  },
+  '@keyframes fadeIn': {
+    from: { opacity: 0, transform: 'translateY(-10px)' },
+    to: { opacity: 1, transform: 'translateY(0)' }
+  }
+};
 
 const DashboardHeader = ({ toggleSidebar, user, userData }) => {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const { darkMode, toggleDarkMode } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+  const addMenuRef = useRef(null);
   
   // Ensure component is mounted before rendering theme-dependent UI
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Efecto para cerrar el menú al hacer clic fuera
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (addMenuRef.current && !addMenuRef.current.contains(event.target)) {
+        setShowAddMenu(false);
+      }
+    }
+    
+    // Añadir evento cuando el menú está abierto
+    if (showAddMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    // Limpieza del evento
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAddMenu]);
   
   const userName = userData?.firstName || user?.displayName?.split(' ')[0] || 'Usuario';
   const userPhoto = user?.photoURL || '/images/logoPlutus.png';
@@ -39,6 +79,11 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
   const handleThemeToggle = () => {
     console.log('Theme toggle clicked, current mode:', darkMode);
     toggleDarkMode();
+  };
+
+  // Función para navegar a la página de perfil
+  const handleProfileClick = () => {
+    router.push('/dashboard/configuracion/perfil');
   };
 
   // Don't render theme-specific elements until client-side hydration is complete
@@ -102,28 +147,19 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
               {darkMode ? <MdLightMode className="h-6 w-6" /> : <MdDarkMode className="h-6 w-6" />}
             </button>
             
-            {/* Add transaction button */}
-            <div className="relative ml-4">
-              <button
-                type="button"
-                className="bg-cyan-600 p-1 rounded-full text-white hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                onClick={() => setShowAddMenu(!showAddMenu)}
-              >
-                <span className="sr-only">Add transaction</span>
-                <MdAdd className="h-6 w-6" />
-              </button>
-            </div>
+          
             
             {/* Profile dropdown */}
             <div className="ml-3 relative">
               <div>
                 <Image 
-                  className="h-8 w-8 rounded-full" 
+                  className="h-8 w-8 rounded-full cursor-pointer" 
                   src={userPhoto} 
                   alt={`${userName}'s profile`}
                   width={32}
                   height={32}
                   onError={handleImageError}
+                  onClick={handleProfileClick}
                 />
               </div>
             </div>
