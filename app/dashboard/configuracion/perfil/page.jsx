@@ -470,7 +470,7 @@ const UserProfilePage = () => {
                   transition-colors duration-150 flex items-center justify-center`}
                 onClick={() => router.push('/dashboard/configuracion/seguridad')}
               >
-                <MdLock className="mr-2" /> Configuración de Seguridad
+                <MdLock className="mr-2" /> Configuración de seguridad
               </button>
               
               {/* Información de actividad reciente */}
@@ -525,7 +525,7 @@ const UserProfilePage = () => {
                     <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                     </svg>
-                    Actualizar a Premium
+                    Actualizar a premium
                   </button>
                 </div>
               </div>
@@ -539,7 +539,7 @@ const UserProfilePage = () => {
           <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
             <div className="flex justify-between items-center mb-4">
               <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                Información Personal
+                Información personal
               </h3>
               
               {!editingPersonalInfo ? (
@@ -634,7 +634,7 @@ const UserProfilePage = () => {
               
               <div>
                 <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Fecha de Nacimiento
+                  Fecha de nacimiento
                 </label>
                 {editingPersonalInfo ? (
                   <input
@@ -730,7 +730,7 @@ const UserProfilePage = () => {
           <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
             <div className="flex justify-between items-center mb-4">
               <h3 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                Información de Contacto
+                Información de contacto
               </h3>
               
               {!editingContactInfo ? (
@@ -1024,11 +1024,23 @@ const UserProfilePage = () => {
           {/* Sección para eliminar cuenta */}
           <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
             <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-              Eliminar Cuenta
+              Eliminar cuenta
             </h3>
-            <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Esta acción eliminará permanentemente tu cuenta y todos tus datos. Esta acción no se puede deshacer.
-            </p>
+            <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20' : 'bg-red-50'} border ${darkMode ? 'border-red-800' : 'border-red-200'} mb-4`}>
+                <div className="flex items-start">
+                  <div className={`p-1 rounded-full ${darkMode ? 'bg-red-800' : 'bg-red-200'}`}>
+                    <MdWarning className={`h-4 w-4 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
+                  </div>
+                  <div className="ml-3">
+                    <p className={`text-sm font-medium ${darkMode ? 'text-red-400' : 'text-red-700'}`}>
+                      Esta acción es irreversible
+                    </p>
+                    <p className={`text-xs mt-1 ${darkMode ? 'text-red-400/70' : 'text-red-600'}`}>
+                      Al eliminar tu cuenta, perderás todos tus datos y no podrás recuperarlos.
+                    </p>
+                  </div>
+                </div>
+              </div>
             <button
               onClick={handleDeleteAccount}
               className={`px-4 py-2 rounded-lg text-sm font-medium

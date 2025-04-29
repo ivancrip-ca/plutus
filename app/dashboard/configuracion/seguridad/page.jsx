@@ -30,7 +30,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 
 const SecurityPage = () => {
   const { darkMode } = useTheme();
-  const { currentUser, userData, signOut } = useAuth();
+  const { currentUser, userData, signOut, getUserSessions, endSession, endAllOtherSessions } = useAuth();
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
@@ -63,47 +63,15 @@ const SecurityPage = () => {
   // Estado de seguridad de contraseña
   const [passwordStrength, setPasswordStrength] = useState(0);
 
-  // Datos simulados para el historial de sesiones
-  const [sessionHistory] = useState([
-    {
-      id: 1,
-      device: 'MacBook Pro',
-      browser: 'Chrome',
-      location: 'Madrid, España',
-      ip: '192.168.1.1',
-      date: new Date(2025, 3, 17, 10, 30),
-      status: 'active'
-    },
-    {
-      id: 2,
-      device: 'iPhone 15',
-      browser: 'Safari',
-      location: 'Madrid, España',
-      ip: '192.168.1.5',
-      date: new Date(2025, 3, 16, 18, 45),
-      status: 'active'
-    },
-    {
-      id: 3,
-      device: 'Windows PC',
-      browser: 'Firefox',
-      location: 'Barcelona, España',
-      ip: '192.168.10.123',
-      date: new Date(2025, 3, 14, 9, 15),
-      status: 'ended'
-    },
-    {
-      id: 4,
-      device: 'Android Phone',
-      browser: 'Chrome',
-      location: 'Desconocida',
-      ip: '192.168.50.78',
-      date: new Date(2025, 3, 10, 22, 5),
-      status: 'ended'
-    }
-  ]);
+  // Estados para historial de sesiones
+  const [sessionHistory, setSessionHistory] = useState([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionError, setSessionError] = useState('');
+  const [closingSession, setClosingSession] = useState(false);
+  const [closingAllSessions, setClosingAllSessions] = useState(false);
+  const [sessionActionSuccess, setSessionActionSuccess] = useState('');
 
-  // Cargar los datos de 2FA al montar el componente
+  // Cargar datos de 2FA y sesiones al montar el componente
   useEffect(() => {
     setMounted(true);
 
@@ -112,7 +80,86 @@ const SecurityPage = () => {
       setTwoFactorMethod(userData.security?.twoFactorMethod || 'email');
       setPhoneNumber(userData.phoneNumber || '');
     }
-  }, [userData]);
+
+    // Cargar historial de sesiones
+    if (currentUser) {
+      loadSessionHistory();
+    }
+  }, [userData, currentUser]);
+
+  // Función para cargar el historial de sesiones
+  const loadSessionHistory = async () => {
+    setLoadingSessions(true);
+    setSessionError('');
+    
+    try {
+      const sessions = await getUserSessions();
+      setSessionHistory(sessions);
+    } catch (error) {
+      console.error('Error al cargar historial de sesiones:', error);
+      setSessionError('No se pudo cargar el historial de sesiones');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  // Función para cerrar una sesión específica
+  const handleCloseSession = async (sessionId) => {
+    setClosingSession(sessionId);
+    setSessionError('');
+    setSessionActionSuccess('');
+    
+    try {
+      const success = await endSession(sessionId);
+      
+      if (success) {
+        setSessionActionSuccess('Sesión cerrada correctamente');
+        // Recargar el historial de sesiones
+        await loadSessionHistory();
+        
+        // Limpiar mensaje de éxito después de 3 segundos
+        setTimeout(() => {
+          setSessionActionSuccess('');
+        }, 3000);
+      } else {
+        setSessionError('No se pudo cerrar la sesión');
+      }
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      setSessionError('Error al cerrar la sesión');
+    } finally {
+      setClosingSession(false);
+    }
+  };
+
+  // Función para cerrar todas las sesiones excepto la actual
+  const handleCloseAllOtherSessions = async () => {
+    setClosingAllSessions(true);
+    setSessionError('');
+    setSessionActionSuccess('');
+    
+    try {
+      const success = await endAllOtherSessions();
+      
+      if (success) {
+        setSessionActionSuccess('Todas las otras sesiones cerradas correctamente');
+        // Recargar el historial de sesiones
+        await loadSessionHistory();
+        
+        // Limpiar mensaje de éxito después de 3 segundos
+        setTimeout(() => {
+          setSessionActionSuccess('');
+        }, 3000);
+      } else {
+        setSessionError('No se pudieron cerrar todas las sesiones');
+      }
+    } catch (error) {
+      console.error('Error al cerrar todas las sesiones:', error);
+      setSessionError('Error al cerrar todas las sesiones');
+    } finally {
+      setClosingAllSessions(false);
+    }
+  };
 
   // Función para verificar la fortaleza de la contraseña
   const checkPasswordStrength = (password) => {
@@ -833,101 +880,157 @@ const SecurityPage = () => {
 
             {/* Historial de sesiones */}
             <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-              <h2 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                Historial de Sesiones
-              </h2>
-
-              <div className="overflow-x-auto">
-                <table className={`min-w-full divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                  <thead>
-                    <tr>
-                      <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Dispositivo</th>
-                      <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Ubicación</th>
-                      <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Fecha</th>
-                      <th scope="col" className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                    {sessionHistory.map((session) => (
-                      <tr key={session.id}>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          <div>
-                            <p className={darkMode ? 'text-white' : 'text-gray-900'}>{session.device}</p>
-                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{session.browser}</p>
-                          </div>
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          <div>
-                            <p>{session.location}</p>
-                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>IP: {session.ip}</p>
-                          </div>
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          {formatDate(session.date)}
-                        </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm`}>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${session.status === 'active'
-                              ? darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'
-                              : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                            {session.status === 'active' ? 'Activa' : 'Finalizada'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-4 flex justify-end">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                  Historial de Sesiones
+                </h2>
+                
                 <button
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium 
-                  ${darkMode
-                      ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50'
-                      : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                  onClick={loadSessionHistory}
+                  disabled={loadingSessions}
+                  className={`p-1.5 rounded-lg ${darkMode
+                      ? 'text-gray-300 hover:text-cyan-400 hover:bg-gray-700'
+                      : 'text-gray-600 hover:text-cyan-600 hover:bg-gray-100'
+                    }`}
                 >
-                  Cerrar todas las sesiones
+                  <MdHistory className="h-5 w-5" />
                 </button>
               </div>
-            </div>
-
-            {/* Eliminar cuenta */}
-            <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-              <h2 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                Eliminar Cuenta
-              </h2>
-
-              <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20' : 'bg-red-50'} border ${darkMode ? 'border-red-800' : 'border-red-200'} mb-4`}>
-                <div className="flex items-start">
-                  <div className={`p-1 rounded-full ${darkMode ? 'bg-red-800' : 'bg-red-200'}`}>
-                    <MdWarning className={`h-4 w-4 ${darkMode ? 'text-red-400' : 'text-red-600'}`} />
-                  </div>
-                  <div className="ml-3">
-                    <p className={`text-sm font-medium ${darkMode ? 'text-red-400' : 'text-red-700'}`}>
-                      Esta acción es irreversible
-                    </p>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-red-400/70' : 'text-red-600'}`}>
-                      Al eliminar tu cuenta, perderás todos tus datos y no podrás recuperarlos.
-                    </p>
+              
+              {sessionError && (
+                <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-800'}`}>
+                  <div className="flex items-center">
+                    <MdWarning className="h-5 w-5 mr-2" />
+                    <p className="text-sm">{sessionError}</p>
                   </div>
                 </div>
+              )}
+              
+              {sessionActionSuccess && (
+                <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'}`}>
+                  <div className="flex items-center">
+                    <MdCheck className="h-5 w-5 mr-2" />
+                    <p className="text-sm">{sessionActionSuccess}</p>
+                  </div>
+                </div>
+              )}
+
+              {loadingSessions ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-t-2 border-cyan-500"></div>
+                  <p className={`ml-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Cargando sesiones...</p>
+                </div>
+              ) : sessionHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className={`inline-flex items-center justify-center h-16 w-16 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'} mb-4`}>
+                    <MdHistory className={`h-8 w-8 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                  </div>
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>No hay historial de sesiones disponible</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className={`min-w-full divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    <thead>
+                      <tr>
+                        <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Dispositivo</th>
+                        <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Ubicación</th>
+                        <th scope="col" className={`px-4 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Fecha</th>
+                        <th scope="col" className={`px-4 py-3 text-right text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} uppercase tracking-wider`}>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                      {sessionHistory.map((session) => (
+                        <tr key={session.id} className={session.isCurrent ? (darkMode ? 'bg-cyan-900/10' : 'bg-cyan-50/50') : ''}>
+                          <td className={`px-4 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <div>
+                              <p className={`${session.isCurrent ? (darkMode ? 'text-cyan-400 font-medium' : 'text-cyan-600 font-medium') : (darkMode ? 'text-white' : 'text-gray-900')}`}>
+                                {session.device}
+                                {session.isCurrent && ' (Actual)'}
+                              </p>
+                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{session.browser}</p>
+                            </div>
+                          </td>
+                          <td className={`px-4 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <div>
+                              <p>{session.location}</p>
+                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>IP: {session.ip}</p>
+                            </div>
+                          </td>
+                          <td className={`px-4 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <div>
+                              <p>Inicio: {formatDate(session.startDate)}</p>
+                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                Última actividad: {formatDate(session.lastActive)}
+                              </p>
+                            </div>
+                          </td>
+                          <td className={`px-4 py-4 whitespace-nowrap text-sm text-right`}>
+                            <button
+                              onClick={() => {
+                                if (session.isCurrent) {
+                                  // Si es la sesión actual, mostrar confirmación
+                                  if (window.confirm('Cerrar esta sesión te desconectará inmediatamente. ¿Estás seguro?')) {
+                                    handleCloseSession(session.id);
+                                    signOut(); // Cerrar sesión en Firebase
+                                    router.push('/login'); // Redirigir al login
+                                  }
+                                } else {
+                                  // Si es otra sesión, cerrarla normalmente
+                                  handleCloseSession(session.id);
+                                }
+                              }}
+                              disabled={closingSession === session.id}
+                              className={`inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded 
+                                ${darkMode
+                                  ? 'text-red-400 hover:bg-red-900/20'
+                                  : 'text-red-700 hover:bg-red-100'
+                                } transition-colors`}
+                            >
+                              {closingSession === session.id ? (
+                                <>
+                                  <div className="animate-spin h-3 w-3 mr-1 border border-b-transparent rounded-full border-red-400"></div>
+                                  Cerrando...
+                                </>
+                              ) : (
+                                session.isCurrent ? 'Cerrar esta sesión' : 'Cerrar sesión'
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-4 flex justify-between items-center">
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {sessionHistory.filter(s => s.status === 'active').length} sesión(es) activa(s) de un total de {sessionHistory.length} sesión(es)
+                </p>
+                
+                {sessionHistory.filter(s => s.status === 'active').length > 1 && (
+                  <button
+                    onClick={handleCloseAllOtherSessions}
+                    disabled={closingAllSessions}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium 
+                    ${darkMode
+                        ? 'bg-red-900/30 text-red-400 hover:bg-red-900/50'
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'}`}
+                  >
+                    {closingAllSessions ? (
+                      <>
+                        <div className="animate-spin inline-block h-3 w-3 mr-1 border border-b-transparent rounded-full border-current"></div>
+                        Cerrando sesiones...
+                      </>
+                    ) : (
+                      'Cerrar todas las sesiones excepto esta'
+                    )}
+                  </button>
+                )}
               </div>
-
-              <p className={`text-sm mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Antes de proceder, te recomendamos que descargues una copia de tus datos. Una vez eliminada la cuenta, todos tus datos personales, transacciones, presupuestos e historial serán eliminados permanentemente.
-              </p>
-
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium
-                ${darkMode
-                    ? 'bg-red-900 text-white hover:bg-red-800'
-                    : 'bg-red-600 text-white hover:bg-red-700'} 
-                transition-colors duration-150 flex items-center`}
-              >
-                <MdDeleteForever className="mr-2" /> Eliminar mi cuenta
-              </button>
             </div>
+
+        
           </div>
         </div>
 

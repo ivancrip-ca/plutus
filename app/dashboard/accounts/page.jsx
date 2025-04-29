@@ -1055,7 +1055,7 @@ const PageAccounts = () => {
       {/* Recent Transactions */}
       <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} rounded-xl shadow-sm border mb-8`}>
         <div className={`p-4 ${darkMode ? 'border-gray-700' : 'border-gray-100'} border-b flex justify-between items-center`}>
-          <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Transacciones Recientes</h2>
+          <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>Transacciones recientes</h2>
           <Link href="/dashboard/transactions" className="text-blue-500 hover:text-blue-700 text-sm font-medium flex items-center cursor-pointer">
             Ver todas <ChevronRight className="h-4 w-4" />
           </Link>
@@ -1395,7 +1395,7 @@ const PageAccounts = () => {
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                {isFormView ? (isEditMode ? "Editar Cuenta" : "Agregar tarjeta") : "Agregar nueva cuenta"}
+                {isFormView ? (isEditMode ? "Editar cuenta" : "Agregar tarjeta") : "Agregar nueva cuenta"}
               </h2>
               <button 
                 onClick={() => {
@@ -1430,7 +1430,7 @@ const PageAccounts = () => {
                 <div className="space-y-4 mb-6">
                   <div>
                     <label htmlFor="bankName" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Nombre del Banco
+                      Nombre del banco
                     </label>
                     <input
                       type="text"
@@ -1467,7 +1467,7 @@ const PageAccounts = () => {
                   
                   <div>
                     <label htmlFor="initialBalance" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Saldo Inicial
+                      Saldo inicial
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1490,7 +1490,7 @@ const PageAccounts = () => {
                   
                   <div>
                     <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Tipo de Cuenta
+                      Tipo de cuenta
                     </label>
                     <div className="flex space-x-2">
                       <div 
@@ -1743,14 +1743,14 @@ const PageAccounts = () => {
               )}
               
               <div className="space-y-4 mb-6">
-                <div className="px-4 py-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-sm mb-4">
+                <div className={`px-4 py-3 rounded-lg  ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'} text-sm mb-4`}>
                   Esta opción te permite establecer un saldo inicial para tu cuenta de efectivo.
                   Los cambios que realices aquí afectarán todas tus transacciones de efectivo.
                 </div>
                 
                 <div>
                   <label htmlFor="saldoInicialEfectivo" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Saldo Inicial
+                    Saldo inicial
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1772,7 +1772,7 @@ const PageAccounts = () => {
                   </p>
                 </div>
                 
-                <div className="px-4 py-3 rounded-lg bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 text-sm">
+                <div className={`px-4 py-3 rounded-lg bg-yellow-50 text-yellow-700 text-sm ${darkMode ? 'bg-yellow-900/30 text-yellow-200' : 'bg-yellow-50 text-yellow-700'} mb-4`}>
                   <p className="font-medium mb-1">Información importante</p>
                   <p>Este valor se registrará como una transacción de tipo "Ingreso" con la categoría "Saldo Inicial" en tu cuenta de efectivo.</p>
                 </div>
@@ -1786,14 +1786,14 @@ const PageAccounts = () => {
                     setEfectivoError('');
                     setEfectivoSuccess('');
                   }}
-                  className={`px-4 py-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
+                  className={`cursor-pointer px-4 py-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
                   disabled={updateEfectivoLoading}
-                  className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center ${updateEfectivoLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  className={`px-4 py-2 cursor-pointer bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center ${updateEfectivoLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
                   {updateEfectivoLoading ? (
                     <>
