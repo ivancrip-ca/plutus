@@ -33,7 +33,8 @@ const BudgetPage = () => {
     endDate: '',
     description: '',
     color: 'bg-blue-500',
-    status: 'activo'
+    status: 'activo',
+    spent: '0'  // Inicializamos spent con un valor por defecto
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -86,7 +87,8 @@ const BudgetPage = () => {
       endDate: '',
       description: '',
       color: 'bg-blue-500',
-      status: 'activo'
+      status: 'activo',
+      spent: '0'
     });
   };
 
@@ -534,8 +536,8 @@ const BudgetPage = () => {
             <div className="mt-4">
               <h4 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>Leyenda</h4>
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {chartData.map((item) => (
-                  <div key={item.category} className="flex items-center">
+                {chartData.map((item, index) => (
+                  <div key={`${item.category}-${index}`} className="flex items-center">
                     <div className={`w-3 h-3 rounded-full ${item.color} mr-2`}></div>
                     <span className="text-xs flex-1">{item.category}</span>
                     <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>

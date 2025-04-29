@@ -4,10 +4,10 @@ import {
   MdPieChart, MdSettings, MdLogout, MdClose, MdExpandMore,
   MdExpandLess, MdCloud, MdPeople, MdPerson, MdSecurity, MdHelp
 } from 'react-icons/md';
-import Image from 'next/image'; // Importar Image desde next/image
-import Link from 'next/link'; // Añadimos la importación de Link
-import { useRouter } from 'next/navigation'; // Importar useRouter para la navegación
-import { useTheme } from '../../app/contexts/ThemeContext'; // Import useTheme hook
+import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useTheme } from '../../app/contexts/ThemeContext';
 
 const DashboardSidebar = ({ 
   sidebarOpen, 
@@ -17,10 +17,10 @@ const DashboardSidebar = ({
   handleLogout, 
   user, 
   userData,
-  darkMode: darkModeProp = false // Keep darkMode prop for backward compatibility, but don't use it directly
+  darkMode: darkModeProp = false
 }) => {
-  const router = useRouter(); // Inicializar el router
-  const { darkMode } = useTheme(); // Use ThemeContext to get global dark mode state
+  const router = useRouter();
+  const { darkMode } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   // Ensure component is mounted before using darkMode from context
@@ -194,74 +194,74 @@ const DashboardSidebar = ({
 
   return (
     <>
-      {/* Mobile sidebar */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
-          {/* Backdrop */}
-          <div
-            className={`fixed inset-0 ${colors.backdrop}`}
-            onClick={() => setSidebarOpen(false)}
-          />
+      {/* Mobile sidebar with transition effects */}
+      <div className={`fixed inset-0 z-40 flex md:hidden transition-opacity duration-300 ease-in-out ${sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* Backdrop with improved transition - reducing opacity to make it less dark */}
+        <div
+          className={`fixed inset-0 ${colors.backdrop} transition-opacity duration-300 ease-in-out ${sidebarOpen ? 'opacity-50' : 'opacity-0'}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+        
+        {/* Sidebar content with slide animation */}
+        <div 
+          className={`relative flex-1 flex flex-col max-w-xs w-full ${colors.sidebar} ${colors.sidebarText} shadow-lg transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        >
+          {/* Close button */}
+          <div className="absolute top-0 right-0 -mr-12 pt-2">
+            <button
+              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white bg-gray-800 bg-opacity-25 transition-transform hover:scale-110 duration-200"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <span className="sr-only">Cerrar barra lateral</span>
+              <MdClose className="h-6 w-6 text-white" />
+            </button>
+          </div>
           
-          {/* Sidebar content */}
-          <div className={`relative flex-1 flex flex-col max-w-xs w-full ${colors.sidebar} ${colors.sidebarText}`}>
-            {/* Close button */}
-            <div className="absolute top-0 right-0 -mr-12 pt-2">
-              <button
-                className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <span className="sr-only">Cerrar barra lateral</span>
-                <MdClose className="h-6 w-6 text-white" />
-              </button>
+          {/* Brand/logo */}
+          <div className="flex-shrink-0 flex items-center px-4 py-6">
+            <h1 className={`text-2xl font-bold text-center ${colors.sidebarText}`}>Plutus</h1>
+          </div>
+          
+          {/* User info */}
+          <div className={`flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-b ${colors.border}`}>
+            <div className="relative w-16 h-16 rounded-full overflow-hidden mb-2">
+              <Image
+                src={userPhoto}
+                alt={userName}
+                width={64}
+                height={64}
+                className="object-cover w-full h-full"
+                onError={handleImageError}
+              />
             </div>
-            
-            {/* Brand/logo */}
-            <div className="flex-shrink-0 flex items-center px-4 py-6 ">
-              <h1 className={`text-2xl font-bold text-center ${colors.sidebarText}`}>Plutus</h1>
-            </div>
-            
-            {/* User info */}
-            <div className={`flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-b ${colors.border}`}>
-              <div className="relative w-16 h-16 rounded-full overflow-hidden mb-2">
-                <Image
-                  src="/images/logoPlus.png"
-                  alt={userName}
-                  width="64"
-                  height="64"
-                  className="object-cover w-full h-full"
-                  onError={handleImageError}
-                />
-              </div>
-              <div className="text-center">
-                <p className={`text-sm font-medium ${colors.sidebarText}`}>{userName}</p>
-                <p className={`text-xs ${colors.sidebarSubtext} truncate`}>{userEmail}</p>
-                <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium ${colors.badgeBg} ${colors.badgeText}`}>
-                  {registrationMethod}
-                </span>
-              </div>
-            </div>
-            
-            {/* Navigation */}
-            <div className="mt-6 flex-1 flex flex-col overflow-y-auto">
-              <nav className="flex-1 px-3 pb-4 space-y-3">
-                {navItems.map(item => renderNavItem(item))}
-                
-                {/* Logout button */}
-                <button
-                  onClick={handleLogout}
-                  className={`mt-4 ${colors.sidebarSubtext} ${colors.navItemHover} group flex items-center px-3 py-3 text-base font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
-                >
-                  <div className={`mr-4 flex-shrink-0 ${colors.iconColor}`}>
-                    <MdLogout className="w-6 h-6" />
-                  </div>
-                  Cerrar sesión
-                </button>
-              </nav>
+            <div className="text-center">
+              <p className={`text-sm font-medium ${colors.sidebarText}`}>{userName}</p>
+              <p className={`text-xs ${colors.sidebarSubtext} truncate`}>{userEmail}</p>
+              <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium ${colors.badgeBg} ${colors.badgeText}`}>
+                {registrationMethod}
+              </span>
             </div>
           </div>
+          
+          {/* Navigation */}
+          <div className="mt-6 flex-1 flex flex-col overflow-y-auto">
+            <nav className="flex-1 px-3 pb-4 space-y-3">
+              {navItems.map(item => renderNavItem(item))}
+              
+              {/* Logout button */}
+              <button
+                onClick={handleLogout}
+                className={`mt-4 ${colors.sidebarSubtext} ${colors.navItemHover} group flex items-center px-3 py-3 text-base font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
+              >
+                <div className={`mr-4 flex-shrink-0 ${colors.iconColor}`}>
+                  <MdLogout className="w-6 h-6" />
+                </div>
+                Cerrar sesión
+              </button>
+            </nav>
+          </div>
         </div>
-      )}
+      </div>
       
       {/* Desktop sidebar (always visible) */}
       <div className="hidden md:flex md:flex-shrink-0">
@@ -277,10 +277,10 @@ const DashboardSidebar = ({
               <div className={`flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-b ${colors.border}`}>
                 <div className="relative w-16 h-16 rounded-full overflow-hidden mb-2">
                   <Image
-                    src="/images/logoPlutus.png"
+                    src={userPhoto}
                     alt={userName}
-                    width="64"
-                    height="64"
+                    width={64}
+                    height={64}
                     className="object-cover w-full h-full"
                     onError={handleImageError}
                   />

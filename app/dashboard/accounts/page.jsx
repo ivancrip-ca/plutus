@@ -792,7 +792,7 @@ const PageAccounts = () => {
   }
   
   return (
-    <div className={`p-6  ${darkMode ? 'text-white bg-gray-900' : ''}`}>
+    <div className={`p-6 ${darkMode ? 'text-white bg-gray-900' : ''}`}>
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'} flex items-center gap-2`}>
@@ -864,21 +864,21 @@ const PageAccounts = () => {
             </>
           ) : (
             <>
-              <div className={`bg-white bg-opacity-10 p-3 rounded-xl ${darkMode ? 'bg-gradient-to-r from-gray-900 to-gray-800' : 'bg-white' }`}>
+              <div className={`bg-white bg-opacity-10 p-3 rounded-xl ${darkMode ? 'bg-gradient-to-r from-gray-900 to-gray-800' : 'bg-white text-gray-800' }`}>
                 <div className="text-sm opacity-75">Ingresos</div>
                 <div className="text-xl font-semibold flex items-center gap-1">
                   <span>--</span>
                 </div>
-                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-white opacity-60'}`}>
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-800 opacity-60'}`}>
                   Agrega una cuenta
                 </p>
               </div>
-              <div className={`bg-white bg-opacity-10 p-3 rounded-xl ${darkMode ? 'bg-gradient-to-r from-gray-900 to-gray-800' : 'bg-white' }`}>
+              <div className={`bg-white bg-opacity-10 p-3 rounded-xl ${darkMode ? 'bg-gradient-to-r from-gray-900 to-gray-800' : 'bg-white text-gray-800' }`}>
                 <div className="text-sm opacity-75">Gastos</div>
                 <div className="text-xl font-semibold flex items-center gap-1">
                   <span>--</span>
                 </div>
-                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-white opacity-60'}`}>
+                <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-800 opacity-60'}`}>
                   Agrega una cuenta
                 </p>
               </div>
@@ -899,7 +899,7 @@ const PageAccounts = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Cuenta de Efectivo (siempre presente) */}
           <div className={`p-6 rounded-xl shadow-sm transition-all duration-300 ${
-            darkMode ? 'bg-gray-800 border border-gray-700 hover:border-gray-500' : 'bg-white border border-gray-100 hover:border-gray-300'
+            darkMode ? 'bg-gray-800 border border-gray-700 hover:border-gray-600' : 'bg-white border border-gray-100 hover:border-gray-300'
           }`}>
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -916,28 +916,32 @@ const PageAccounts = () => {
                 </div>
                 
                 {/* Saldo de efectivo y mensaje */}
-                {efectivoTransactions.length > 0 ? (
-                  <>
-                    <div className={`mt-4 text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                      ${saldoEfectivo.toLocaleString('en-US', {minimumFractionDigits: 2})}
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      {efectivoTransactions.length} transacciones registradas
-                    </div>
-                  </>
-                ) : (
-                  <div className="mt-4 text-sm p-3 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    No has registrado transacciones en efectivo aún. 
-                    <br/>
-                    <Link href="/dashboard/transactions" className="font-medium mt-1 inline-block text-blue-600 dark:text-blue-400 hover:underline">
-                      Registra tu primera transacción →
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Botones de acción */}
+                        {efectivoTransactions.length > 0 ? (
+                          <>
+                          <div className={`mt-4 text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                            ${saldoEfectivo.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                          </div>
+                          <div className={`mt-1 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {efectivoTransactions.length} transacciones registradas
+                          </div>
+                          </>
+                        ) : (
+                          <div className={`mt-4 text-sm p-3 rounded-lg ${
+                          darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'
+                          }`}>
+                          No has registrado transacciones en efectivo aún. 
+                          <br/>
+                          <Link href="/dashboard/transactions" className={`font-medium mt-1 inline-block ${
+                            darkMode ? 'text-blue-400' : 'text-blue-600'
+                          } hover:underline`}>
+                            Registra tu primera transacción →
+                          </Link>
+                          </div>
+                        )}
+                        </div>
+                      </div>
+                      
+                      {/* Botones de acción */}
             <div className="mt-6 flex justify-between items-center">
               <button 
                 onClick={() => setIsEfectivoModalOpen(true)}
@@ -958,7 +962,7 @@ const PageAccounts = () => {
             <div 
               key={account.id} 
               onClick={() => setSelectedAccount(account)}
-              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-white border-gray-100 hover:shadow-md'} rounded-xl shadow-sm border p-4 cursor-pointer transition-shadow`}
+              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-white border-gray-100 hover:shadow-md'} rounded-xl shadow-sm border p-4 cursor-pointer transition-shadow`}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center">
@@ -1010,7 +1014,7 @@ const PageAccounts = () => {
               </div>
               
               <div className="mt-2">
-                <div className={`text-xl font-bold ${account.balance < 0 ? 'text-red-600' : darkMode ? 'text-white' : 'text-gray-900'}`}>
+                <div className={`text-xl font-bold ${account.balance < 0 ? 'text-red-500' : darkMode ? 'text-white' : 'text-gray-900'}`}>
                   ${Math.abs(account.balance).toLocaleString('en-US', {minimumFractionDigits: 2})}
                 </div>
                 <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
@@ -1036,10 +1040,10 @@ const PageAccounts = () => {
                   color: ''
                 });
               }}
-              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'} rounded-xl border border-dashed p-4 cursor-pointer transition-colors flex flex-col items-center justify-center min-h-[160px]`}
+              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'} rounded-xl border border-dashed p-4 cursor-pointer transition-colors flex flex-col items-center justify-center min-h-[160px]`}
             >
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-2">
-                <Plus className="h-6 w-6 text-blue-500" />
+              <div className={`h-12 w-12 rounded-full ${darkMode ? 'bg-blue-900/30' : 'bg-blue-100'} flex items-center justify-center mb-2`}>
+                <Plus className={`h-6 w-6 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
               </div>
               <h3 className={`font-medium cursor-pointer ${darkMode ? 'text-white' : 'text-gray-900'}`}>Agregar cuenta</h3>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-center mt-1`}>Conectar banco o tarjeta</p>
