@@ -1,34 +1,96 @@
 'use client';
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { MdAccountBalance, MdDashboard, MdAttachMoney, MdInsights, MdShowChart, MdSecurity, MdDevices } from "react-icons/md";
+import { auth, db } from './firebase';
+import { applyActionCode, checkActionCode } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
+import { NotificationContext } from './contexts/NotificationContext';
 
 export default function Home() {
+  const { showNotification } = useContext(NotificationContext);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Evitar errores de hidratación
+  // Evitar errores de hidratación y procesar parámetros de verificación
   useEffect(() => {
     setMounted(true);
 
     // Verificar si hay parámetros de restablecimiento de contraseña o verificación de correo
     const mode = searchParams.get('mode');
     const oobCode = searchParams.get('oobCode');
+    const continueUrl = searchParams.get('continueUrl');
+    
+    // Verificar si ya se ha procesado este código antes (para evitar bucles)
+    const isProcessed = sessionStorage.getItem(`verification_processed_${oobCode}`);
+    
+    if (isProcessed) {
+      console.log('Este código ya fue procesado anteriormente, ignorando para evitar bucles');
+      return;
+    }
     
     if (mode === 'resetPassword' && oobCode) {
       console.log('Detectado enlace de restablecimiento de contraseña, redirigiendo...');
       // Redirigir a la página personalizada de restablecimiento de contraseña
       router.push(`/reset-password?oobCode=${oobCode}`);
     } else if (mode === 'verifyEmail' && oobCode) {
-      console.log('Detectado enlace de verificación de correo electrónico, redirigiendo...');
-      // Redirigir a la página personalizada de verificación de correo
-      router.push(`/verify-email?oobCode=${oobCode}`);
+      console.log('Detectado enlace de verificación de correo electrónico');
+      
+      // Marcar como procesado para evitar bucles
+      sessionStorage.setItem(`verification_processed_${oobCode}`, 'true');
+      
+      // Proceso de verificación de correo
+      const verifyEmail = async () => {
+        try {
+          // Verificar el código
+          await checkActionCode(auth, oobCode);
+          
+          // Aplicar el código para verificar el correo
+          await applyActionCode(auth, oobCode);
+          
+          // Si tenemos un usuario autenticado, actualizar Firestore
+          if (auth.currentUser) {
+            try {
+              const userRef = doc(db, 'users', auth.currentUser.uid);
+              await updateDoc(userRef, {
+                emailVerified: true
+              });
+            } catch (firestoreError) {
+              console.error('Error al actualizar estado de verificación en Firestore:', firestoreError);
+            }
+          }
+          
+          // Mostrar notificación de éxito
+          showNotification('¡Tu correo electrónico ha sido verificado correctamente!', 'success');
+          
+          // Redirigir a la URL de continuación o al dashboard
+          if (continueUrl) {
+            // Eliminamos los parámetros de la URL para evitar procesamiento repetido
+            window.history.replaceState({}, document.title, continueUrl.split('?')[0]);
+            router.replace(continueUrl);
+          } else {
+            window.history.replaceState({}, document.title, '/dashboard');
+            router.replace('/dashboard');
+          }
+        } catch (error) {
+          console.error('Error de verificación:', error);
+          
+          // Mostrar notificación de error
+          showNotification('No se pudo verificar tu correo electrónico. Por favor, intenta de nuevo.', 'error');
+          
+          // Limpiar la URL y redirigir al dashboard con un mensaje de error
+          window.history.replaceState({}, document.title, '/dashboard?verificationFailed=true');
+          router.replace('/dashboard?verificationFailed=true');
+        }
+      };
+      
+      verifyEmail();
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, showNotification]);
 
   // Función para manejar desplazamiento suave a las secciones
   const scrollToSection = (e, sectionId) => {
@@ -452,3 +514,95 @@ const FaqItem = ({ question, answer }) => {
     </div>
   );
 };
+
+// Página para interceptar los enlaces de verificación
+export function Page() {
+  const { showNotification } = useContext(NotificationContext);
+  const [processing, setProcessing] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Detectar parámetros de verificación de correo en la URL
+    const mode = searchParams.get('mode');
+    const oobCode = searchParams.get('oobCode');
+    const continueUrl = searchParams.get('continueUrl');
+    
+    // Verificar si ya se ha procesado este código antes (para evitar bucles)
+    const isProcessed = sessionStorage.getItem(`verification_processed_${oobCode}`);
+    
+    if (isProcessed) {
+      console.log('Este código ya fue procesado anteriormente por Page, ignorando para evitar bucles');
+      setProcessing(false);
+      router.replace('/dashboard');
+      return;
+    }
+    
+    const handleVerificationParams = async () => {
+      // Si hay un código de verificación y el modo es "verifyEmail", procesarlo
+      if (mode === 'verifyEmail' && oobCode) {
+        // Marcar como procesado para evitar bucles
+        sessionStorage.setItem(`verification_processed_${oobCode}`, 'true');
+        
+        try {
+          // Verificar el código
+          const info = await checkActionCode(auth, oobCode);
+          
+          // Aplicar el código para verificar el correo
+          await applyActionCode(auth, oobCode);
+          
+          // Si tenemos un usuario autenticado, actualizar Firestore
+          if (auth.currentUser) {
+            try {
+              const userRef = doc(db, 'users', auth.currentUser.uid);
+              await updateDoc(userRef, {
+                emailVerified: true
+              });
+            } catch (firestoreError) {
+              console.error('Error al actualizar estado de verificación en Firestore:', firestoreError);
+            }
+          }
+          
+          // Mostrar notificación de éxito
+          showNotification('Tu correo electrónico ha sido verificado correctamente.', 'success');
+          
+          // Limpiar la URL y redirigir
+          if (continueUrl) {
+            // Limpiamos la URL para evitar procesamiento repetido
+            window.history.replaceState({}, document.title, continueUrl.split('?')[0]);
+            router.replace(continueUrl);
+          } else {
+            window.history.replaceState({}, document.title, '/dashboard');
+            router.replace('/dashboard');
+          }
+        } catch (error) {
+          console.error('Error de verificación:', error);
+          
+          // Limpiar la URL y mostrar mensaje de error
+          window.history.replaceState({}, document.title, '/dashboard?verificationFailed=true');
+          showNotification('No se pudo verificar tu correo. Por favor, intenta de nuevo.', 'error');
+          router.replace('/dashboard?verificationFailed=true');
+        }
+      } else {
+        // Si no hay parámetros de verificación, ir a la página principal
+        router.replace('/dashboard');
+      }
+      
+      setProcessing(false);
+    };
+    
+    handleVerificationParams();
+  }, [searchParams, router, showNotification]);
+  
+  // Pantalla de carga mientras se procesa
+  if (processing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-600 mb-4"></div>
+        <p className="text-gray-600">Verificando tu correo electrónico...</p>
+      </div>
+    );
+  }
+  
+  return null;
+}

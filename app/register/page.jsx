@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MdPerson, MdEmail, MdLock, MdAccountBalance, MdCheckCircle } from 'react-icons/md';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
@@ -20,7 +20,6 @@ export default function Register() {
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [strengthText, setStrengthText] = useState('');
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -102,27 +101,8 @@ export default function Register() {
         role: 'user',
         emailVerified: false
       });
-
-      const isLocalhost = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1';
       
-      let baseUrl;
-      if (isLocalhost) {
-        baseUrl = `http://${window.location.hostname}:${window.location.port || '3000'}`;
-      } else {
-        baseUrl = window.location.origin;
-      }
-      
-      try {
-        await sendEmailVerification(user, {
-          url: `${baseUrl}/dashboard`,
-          handleCodeInApp: true
-        });
-        setVerificationSent(true);
-        console.log('Correo de verificación enviado a:', email);
-      } catch (verificationError) {
-        console.error('Error al enviar correo de verificación:', verificationError);
-      }
+      // Se ha eliminado el envío del correo de verificación
       
       setRegistrationSuccess(true);
       
@@ -167,16 +147,7 @@ export default function Register() {
               </div>
               <h2 className="text-2xl font-semibold text-gray-900">¡Cuenta creada exitosamente!</h2>
               <p className="text-gray-600 mt-4 mb-6">
-                {verificationSent ? (
-                  <>
-                    Te hemos enviado un correo de verificación a <strong>{email}</strong>.<br />
-                    Por favor, verifica tu correo electrónico para activar todas las funcionalidades de tu cuenta.
-                  </>
-                ) : (
-                  <>
-                    Tu cuenta ha sido creada correctamente. Ahora puedes acceder a tu dashboard.
-                  </>
-                )}
+                Tu cuenta ha sido creada correctamente. Ahora puedes acceder a tu dashboard.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/dashboard" className="px-6 py-3 rounded-lg text-base font-medium bg-cyan-600 text-white hover:bg-cyan-700 text-center">

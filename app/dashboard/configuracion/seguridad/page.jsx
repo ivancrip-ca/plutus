@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   MdLock,
@@ -19,18 +19,21 @@ import {
 } from 'react-icons/md';
 import { useTheme } from '../../../../app/contexts/ThemeContext';
 import { useAuth } from '../../../../app/contexts/AuthContext';
+import { NotificationContext } from '../../../../app/contexts/NotificationContext';
 import { auth, db } from '../../../../app/firebase';
 import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
-  sendEmailVerification
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 
 const SecurityPage = () => {
   const { darkMode } = useTheme();
-  const { currentUser, userData, signOut, getUserSessions, endSession, endAllOtherSessions } = useAuth();
+  const { currentUser, userData, logout, getUserSessions, endSession, endAllOtherSessions } = useAuth();
+  const { showNotification } = useContext(NotificationContext);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
@@ -40,23 +43,16 @@ const SecurityPage = () => {
 
   // Estados para las contraseñas
   const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
 
   // Estados para la autenticación de dos factores
   const [twoFactorMethod, setTwoFactorMethod] = useState('email');
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
 
-  // Estado para el modal de verificación
-  const [showReauthModal, setShowReauthModal] = useState(false);
-  const [actionAfterReauth, setActionAfterReauth] = useState(null);
-  const [reauthPassword, setReauthPassword] = useState('');
-  const [reauthError, setReauthError] = useState('');
-
-  // Estado para el modal de eliminación de cuenta
+  // Estado para la eliminación de cuenta
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
@@ -70,6 +66,11 @@ const SecurityPage = () => {
   const [closingSession, setClosingSession] = useState(false);
   const [closingAllSessions, setClosingAllSessions] = useState(false);
   const [sessionActionSuccess, setSessionActionSuccess] = useState('');
+  
+  // Estados para los modales de recursos de seguridad
+  const [showSecurityPracticesModal, setShowSecurityPracticesModal] = useState(false);
+  const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
+  const [showHelpCenterModal, setShowHelpCenterModal] = useState(false);
 
   // Cargar datos de 2FA y sesiones al montar el componente
   useEffect(() => {
@@ -161,117 +162,69 @@ const SecurityPage = () => {
     }
   };
 
-  // Función para verificar la fortaleza de la contraseña
-  const checkPasswordStrength = (password) => {
-    let strength = 0;
-
-    // Longitud mínima
-    if (password.length >= 8) strength += 1;
-
-    // Contiene números
-    if (/\d/.test(password)) strength += 1;
-
-    // Contiene letras minúsculas y mayúsculas
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength += 1;
-
-    // Contiene caracteres especiales
-    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
-
-    setPasswordStrength(strength);
-  };
-
   // Función para cambiar contraseña
   const handlePasswordChange = async (e) => {
     e.preventDefault();
 
-    // Validar que las contraseñas coinciden
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Las contraseñas no coinciden');
+    if (!currentPassword) {
+      setPasswordError('Por favor, introduce tu contraseña actual');
       return;
     }
 
-    // Validar fortaleza de contraseña
-    if (passwordStrength < 3) {
-      setPasswordError('La contraseña no es lo suficientemente segura');
-      return;
-    }
-
-    // Mostrar modal de reautenticación
-    setActionAfterReauth('changePassword');
-    setShowReauthModal(true);
-  };
-
-  // Función para reautenticar al usuario
-  const handleReauthenticate = async () => {
     try {
-      // Crear credencial
+      // Crear credencial para reautenticar directamente sin mostrar modal
       const credential = EmailAuthProvider.credential(
         currentUser.email,
-        reauthPassword
+        currentPassword
       );
 
-      // Reautenticar
+      // Reautenticar al usuario
       await reauthenticateWithCredential(currentUser, credential);
 
-      // Cerrar modal
-      setShowReauthModal(false);
-      setReauthError('');
-      setReauthPassword('');
-
-      // Ejecutar acción después de la reautenticación
-      if (actionAfterReauth === 'changePassword') {
-        try {
-          await updatePassword(currentUser, newPassword);
-
-          // Actualizar estado
-          setPasswordSuccess(true);
-          setPasswordError('');
-          setCurrentPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-          setChangingPassword(false);
-
-          // Resetear el estado después de 3 segundos
-          setTimeout(() => {
-            setPasswordSuccess(false);
-          }, 3000);
-        } catch (error) {
-          setPasswordError('Error al actualizar la contraseña: ' + error.message);
+      // Una vez autenticado, enviar el correo de restablecimiento
+      try {
+        // Determinar si estamos en desarrollo o producción
+        const isLocalhost = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1';
+        
+        // URL base para el redireccionamiento
+        let baseUrl;
+        if (isLocalhost) {
+          // Para desarrollo local (usando puerto 3000 por defecto para Next.js)
+          baseUrl = `http://${window.location.hostname}:${window.location.port || '3000'}`;
+        } else {
+          // Para producción
+          baseUrl = window.location.origin;
         }
-      } else if (actionAfterReauth === 'deleteAccount') {
-        // En una implementación real aquí eliminarías la cuenta
-        try {
-          // Eliminar usuario de Firebase Auth
-          await currentUser.delete();
+        
+        // Configurar los ajustes de restablecimiento de contraseña
+        const actionCodeSettings = {
+          url: `${baseUrl}/reset-password`,
+          handleCodeInApp: true
+        };
+        
+        // Enviar el correo de restablecimiento de contraseña
+        await sendPasswordResetEmail(auth, currentUser.email, actionCodeSettings);
+        
+        // Actualizar estado
+        setPasswordSuccess(true);
+        setPasswordResetSent(true);
+        setPasswordError('');
+        setCurrentPassword('');
+        setChangingPassword(false);
 
-          // Eliminar datos de Firestore
-          // const userDocRef = doc(db, 'users', currentUser.uid);
-          // await deleteDoc(userDocRef);
-
-          // Redireccionar al login
-          await signOut();
-          router.push('/login');
-        } catch (error) {
-          console.error('Error al eliminar la cuenta:', error);
-        }
-      } else if (actionAfterReauth === 'enable2FA') {
-        try {
-          // Actualizar preferencias de 2FA en Firestore
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          await updateDoc(userDocRef, {
-            'security.twoFactorEnabled': true,
-            'security.twoFactorMethod': twoFactorMethod
-          });
-
-          // Actualizar estado
-          setTwoFactorEnabled(true);
-          setEnabling2FA(false);
-        } catch (error) {
-          console.error('Error al activar 2FA:', error);
-        }
+        // Resetear el estado después de 5 segundos
+        setTimeout(() => {
+          setPasswordSuccess(false);
+          setPasswordResetSent(false);
+        }, 5000);
+      } catch (error) {
+        console.error("Error al enviar correo de restablecimiento:", error);
+        setPasswordError('Error al enviar el correo de restablecimiento: ' + error.message);
       }
     } catch (error) {
-      setReauthError('Contraseña incorrecta');
+      console.error("Error al autenticar:", error);
+      setPasswordError('La contraseña actual es incorrecta');
     }
   };
 
@@ -289,9 +242,20 @@ const SecurityPage = () => {
       return;
     }
 
-    // Mostrar modal de reautenticación
-    setActionAfterReauth('enable2FA');
-    setShowReauthModal(true);
+    try {
+      // Actualizar preferencias de 2FA en Firestore
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userDocRef, {
+        'security.twoFactorEnabled': true,
+        'security.twoFactorMethod': twoFactorMethod
+      });
+
+      // Actualizar estado
+      setTwoFactorEnabled(true);
+      setEnabling2FA(false);
+    } catch (error) {
+      console.error('Error al activar 2FA:', error);
+    }
   };
 
   // Función para deshabilitar 2FA
@@ -354,7 +318,7 @@ const SecurityPage = () => {
             {/* Estado de seguridad */}
             <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
               <h2 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                Estado de Seguridad
+                Estado de seguridad
               </h2>
 
               <div className="space-y-4">
@@ -364,7 +328,7 @@ const SecurityPage = () => {
                   </div>
                   <div className="ml-3">
                     <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Email Verificado
+                      Email verificado
                     </h3>
                     <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       {currentUser?.emailVerified
@@ -372,12 +336,36 @@ const SecurityPage = () => {
                         : 'Tu correo electrónico no está verificado.'}
                     </p>
                     {!currentUser?.emailVerified && (
-                      <button
-                        onClick={sendVerification}
-                        className={`mt-1 text-xs font-medium ${darkMode ? 'text-cyan-400' : 'text-cyan-600'}`}
-                      >
-                        Enviar correo de verificación
-                      </button>
+                      <div className="mt-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Definir URL de redireccionamiento que permita verificar el correo correctamente
+                              const actionCodeSettings = {
+                                url: window.location.origin + '/verify-email', // Redirigir a la página de verificación
+                                handleCodeInApp: false // Cambiar a false para que use el flujo normal de Firebase
+                              };
+                              
+                              await sendEmailVerification(auth.currentUser, actionCodeSettings);
+                              showNotification('Hemos enviado un correo de verificación a tu dirección. Por favor, revisa tu bandeja de entrada y sigue las instrucciones.', 'success');
+                            } catch (error) {
+                              console.error('Error al enviar correo de verificación:', error);
+                              
+                              if (error.code === 'auth/too-many-requests') {
+                                showNotification('Has enviado demasiadas solicitudes de verificación recientemente. Por favor, espera unos minutos antes de intentarlo de nuevo.', 'warning');
+                              } else {
+                                showNotification('No se pudo enviar el correo de verificación. Por favor, intenta de nuevo más tarde.', 'error');
+                              }
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium 
+                            ${darkMode
+                              ? 'bg-cyan-900/30 text-cyan-400 hover:bg-cyan-900/50'
+                              : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200'}`}
+                        >
+                          Verificar ahora
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -388,7 +376,7 @@ const SecurityPage = () => {
                   </div>
                   <div className="ml-3">
                     <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Autenticación de Dos Factores
+                      Autenticación de dos factores
                     </h3>
                     <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       {twoFactorEnabled
@@ -404,7 +392,7 @@ const SecurityPage = () => {
                   </div>
                   <div className="ml-3">
                     <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Sesiones Activas
+                      Sesiones activas
                     </h3>
                     <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       {sessionHistory.filter(s => s.status === 'active').length} sesión(es) activa(s) en este momento.
@@ -417,12 +405,16 @@ const SecurityPage = () => {
             {/* Recursos de seguridad */}
             <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
               <h2 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                Recursos de Seguridad
+                Recursos de seguridad
               </h2>
 
               <div className="space-y-3">
                 <a
                   href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowSecurityPracticesModal(true);
+                  }}
                   className={`block p-3 rounded-lg border ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'} transition-colors`}
                 >
                   <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -435,6 +427,10 @@ const SecurityPage = () => {
 
                 <a
                   href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowPrivacyPolicyModal(true);
+                  }}
                   className={`block p-3 rounded-lg border ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'} transition-colors`}
                 >
                   <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -447,6 +443,10 @@ const SecurityPage = () => {
 
                 <a
                   href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowHelpCenterModal(true);
+                  }}
                   className={`block p-3 rounded-lg border ${darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'} transition-colors`}
                 >
                   <h3 className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -485,8 +485,6 @@ const SecurityPage = () => {
                       onClick={() => {
                         setChangingPassword(false);
                         setCurrentPassword('');
-                        setNewPassword('');
-                        setConfirmPassword('');
                         setPasswordError('');
                       }}
                       className={`p-1.5 rounded-lg ${darkMode
@@ -504,7 +502,7 @@ const SecurityPage = () => {
                 <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-800'}`}>
                   <div className="flex items-center">
                     <MdCheck className="h-5 w-5 mr-2" />
-                    <p className="text-sm">Contraseña actualizada con éxito.</p>
+                    <p className="text-sm">{passwordResetSent ? 'Se ha enviado un correo para restablecer tu contraseña. Revisa tu bandeja de entrada.' : 'Contraseña actualizada con éxito.'}</p>
                   </div>
                 </div>
               )}
@@ -522,69 +520,21 @@ const SecurityPage = () => {
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
                     <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Nueva Contraseña
+                      Contraseña Actual
                     </label>
                     <input
                       type="password"
-                      value={newPassword}
-                      onChange={(e) => {
-                        setNewPassword(e.target.value);
-                        checkPasswordStrength(e.target.value);
-                      }}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
                       className={`w-full px-3 py-2 rounded-lg border ${darkMode
                           ? 'bg-gray-700 border-gray-600 text-white focus:border-cyan-500'
                           : 'bg-white border-gray-300 text-gray-700 focus:border-cyan-500'
                         } focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                       required
                     />
-
-                    {/* Indicador de fortaleza de contraseña */}
-                    <div className="mt-1">
-                      <div className="flex items-center space-x-1">
-                        {[...Array(4)].map((_, i) => (
-                          <div
-                            key={i}
-                            className={`h-1 rounded-full flex-1 ${i < passwordStrength
-                                ? passwordStrength === 1
-                                  ? 'bg-red-500'
-                                  : passwordStrength === 2
-                                    ? 'bg-yellow-500'
-                                    : passwordStrength === 3
-                                      ? 'bg-green-500'
-                                      : 'bg-green-600'
-                                : darkMode ? 'bg-gray-600' : 'bg-gray-200'
-                              }`}
-                          ></div>
-                        ))}
-                      </div>
-                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {passwordStrength === 0 && 'Introduce una contraseña'}
-                        {passwordStrength === 1 && 'Contraseña débil'}
-                        {passwordStrength === 2 && 'Contraseña moderada'}
-                        {passwordStrength === 3 && 'Contraseña segura'}
-                        {passwordStrength === 4 && 'Contraseña muy segura'}
-                      </p>
-                    </div>
-
                     <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      La contraseña debe tener al menos 8 caracteres, incluir números, mayúsculas, minúsculas y caracteres especiales.
+                      Ingresa tu contraseña actual para verificar tu identidad. Luego recibirás un correo para establecer una nueva contraseña.
                     </p>
-                  </div>
-
-                  <div>
-                    <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Confirmar Contraseña
-                    </label>
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-lg border ${darkMode
-                          ? 'bg-gray-700 border-gray-600 text-white focus:border-cyan-500'
-                          : 'bg-white border-gray-300 text-gray-700 focus:border-cyan-500'
-                        } focus:outline-none focus:ring-1 focus:ring-cyan-500`}
-                      required
-                    />
                   </div>
 
                   <div className="flex justify-end">
@@ -621,7 +571,7 @@ const SecurityPage = () => {
             <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
               <div className="flex justify-between items-center mb-4">
                 <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                  Autenticación de Dos Factores
+                  Autenticación de dos factores
                 </h2>
 
                 {twoFactorEnabled ? (
@@ -882,7 +832,7 @@ const SecurityPage = () => {
             <div className={`p-6 rounded-xl border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
               <div className="flex justify-between items-center mb-4">
                 <h2 className={`text-lg font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>
-                  Historial de Sesiones
+                  Historial de sesiones
                 </h2>
                 
                 <button
@@ -971,7 +921,7 @@ const SecurityPage = () => {
                                   // Si es la sesión actual, mostrar confirmación
                                   if (window.confirm('Cerrar esta sesión te desconectará inmediatamente. ¿Estás seguro?')) {
                                     handleCloseSession(session.id);
-                                    signOut(); // Cerrar sesión en Firebase
+                                    logout(); // Usar la función de logout del contexto
                                     router.push('/login'); // Redirigir al login
                                   }
                                 } else {
@@ -1034,79 +984,13 @@ const SecurityPage = () => {
           </div>
         </div>
 
-        {/* Modal de reautenticación */}
-        {showReauthModal && (
-          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
-            <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setShowReauthModal(false)}></div>
-            <div className={`relative w-full max-w-md p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
-              <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Verificar Identidad
-              </h3>
-
-              <p className={`text-sm mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Por razones de seguridad, debes introducir tu contraseña actual para continuar.
-              </p>
-
-              {reauthError && (
-                <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-800'}`}>
-                  <div className="flex items-center">
-                    <MdWarning className="h-5 w-5 mr-2" />
-                    <p className="text-sm">{reauthError}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="mb-4">
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  Contraseña Actual
-                </label>
-                <input
-                  type="password"
-                  value={reauthPassword}
-                  onChange={(e) => setReauthPassword(e.target.value)}
-                  className={`w-full px-3 py-2 rounded-lg border ${darkMode
-                      ? 'bg-gray-700 border-gray-600 text-white focus:border-cyan-500'
-                      : 'bg-white border-gray-300 text-gray-700 focus:border-cyan-500'
-                    } focus:outline-none focus:ring-1 focus:ring-cyan-500`}
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowReauthModal(false);
-                    setReauthPassword('');
-                    setReauthError('');
-                  }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium
-                  ${darkMode
-                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleReauthenticate}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium 
-                  ${darkMode
-                      ? 'bg-cyan-700 text-white hover:bg-cyan-600'
-                      : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                >
-                  Verificar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Modal de eliminación de cuenta */}
         {showDeleteModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
             <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setShowDeleteModal(false)}></div>
             <div className={`relative w-full max-w-md p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
               <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                Eliminar Cuenta Permanentemente
+                Eliminar cuenta permanentemente
               </h3>
 
               <div className={`p-4 rounded-lg ${darkMode ? 'bg-red-900/20' : 'bg-red-50'} border ${darkMode ? 'border-red-800' : 'border-red-200'} mb-4`}>
@@ -1176,6 +1060,385 @@ const SecurityPage = () => {
                     }`}
                 >
                   Eliminar Permanentemente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Buenas Prácticas de Seguridad */}
+        {showSecurityPracticesModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity" onClick={() => setShowSecurityPracticesModal(false)}></div>
+            <div className={`relative w-full max-w-3xl p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className={`text-xl font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Buenas Prácticas de Seguridad
+                </h3>
+                <button 
+                  onClick={() => setShowSecurityPracticesModal(false)}
+                  className={`p-1.5 rounded-lg ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <MdClose className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Consejos para mantener tu cuenta segura</h4>
+                  <ul className={`space-y-3 ml-4 list-disc ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <li>
+                      <p className="font-medium">Usa contraseñas fuertes y únicas</p>
+                      <p className="text-sm mt-1">Crea contraseñas de al menos 12 caracteres que incluyan letras mayúsculas y minúsculas, números y símbolos. Evita usar información personal.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">Activa la autenticación de dos factores (2FA)</p>
+                      <p className="text-sm mt-1">Añade una capa adicional de seguridad a tu cuenta requiriendo una segunda forma de verificación además de tu contraseña.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">No compartas tus credenciales</p>
+                      <p className="text-sm mt-1">Nunca compartas tus contraseñas ni códigos de verificación con nadie, incluyendo al soporte técnico de Plutus.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">Cierra sesión en dispositivos no utilizados</p>
+                      <p className="text-sm mt-1">Gestiona tus sesiones activas y cierra aquellas que no reconozcas o ya no utilices.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">Actualiza regularmente tu contraseña</p>
+                      <p className="text-sm mt-1">Cambia tu contraseña cada 3-6 meses para mantener tu cuenta segura.</p>
+                    </li>
+                  </ul>
+                </section>
+
+                <section className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Cómo identificar intentos de phishing</h4>
+                  <p className={`mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Los ataques de phishing intentan engañarte para que reveles información personal como contraseñas o datos bancarios.
+                  </p>
+                  <ul className={`space-y-2 ml-4 list-disc ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <li>Desconfía de correos o mensajes que soliciten información personal.</li>
+                    <li>Verifica siempre la URL antes de ingresar credenciales (plutus.com vs plutus-secure.com).</li>
+                    <li>Nunca hagas clic en enlaces sospechosos de correos electrónicos no solicitados.</li>
+                    <li>Plutus nunca te pedirá tu contraseña completa por teléfono o correo electrónico.</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Protege tu dispositivo</h4>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Mantén tu software actualizado</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Actualiza regularmente tu sistema operativo, navegador y aplicaciones para protegerte contra vulnerabilidades conocidas.
+                      </p>
+                    </div>
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Usa software antivirus</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Instala y mantén actualizado un programa antivirus confiable en todos tus dispositivos.
+                      </p>
+                    </div>
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>No uses redes Wi-Fi públicas</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Evita acceder a tu cuenta bancaria o financiera mientras estás conectado a redes Wi-Fi públicas no seguras.
+                      </p>
+                    </div>
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Utiliza bloqueo de pantalla</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Configura un bloqueo de pantalla seguro (PIN, patrón o biométrico) en todos tus dispositivos.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowSecurityPracticesModal(false)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium
+                  ${darkMode
+                    ? 'bg-cyan-700 text-white hover:bg-cyan-600'
+                    : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Política de Privacidad */}
+        {showPrivacyPolicyModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity" onClick={() => setShowPrivacyPolicyModal(false)}></div>
+            <div className={`relative w-full max-w-3xl p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className={`text-xl font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Política de Privacidad
+                </h3>
+                <button 
+                  onClick={() => setShowPrivacyPolicyModal(false)}
+                  className={`p-1.5 rounded-lg ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <MdClose className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Información que recopilamos</h4>
+                  <p className={`mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    En Plutus nos comprometemos a proteger tu privacidad. A continuación, detallamos qué tipo de información recopilamos y cómo la utilizamos:
+                  </p>
+                  <ul className={`space-y-2 ml-4 list-disc ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <li>
+                      <p className="font-medium">Información de registro</p>
+                      <p className="text-sm mt-1">Nombre, dirección de correo electrónico y contraseña encriptada.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">Datos financieros</p>
+                      <p className="text-sm mt-1">Transacciones, presupuestos, categorías y metadatos relacionados que ingresas voluntariamente.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">Información del dispositivo</p>
+                      <p className="text-sm mt-1">Dirección IP, tipo de navegador, sistema operativo y otros datos técnicos para mejorar la seguridad.</p>
+                    </li>
+                    <li>
+                      <p className="font-medium">Información de uso</p>
+                      <p className="text-sm mt-1">Estadísticas sobre cómo utilizas nuestra aplicación para mejorar la experiencia del usuario.</p>
+                    </li>
+                  </ul>
+                </section>
+
+                <section className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Cómo protegemos tus datos</h4>
+                  <p className={`mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Implementamos medidas técnicas y organizativas diseñadas para proteger tus datos personales:
+                  </p>
+                  <ul className={`space-y-2 ml-4 list-disc ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <li>Encriptación de datos sensibles en tránsito y en reposo.</li>
+                    <li>Autenticación de dos factores para proteger el acceso a cuentas.</li>
+                    <li>Monitoreo continuo de amenazas de seguridad.</li>
+                    <li>Acceso restringido a datos personales dentro de nuestra organización.</li>
+                    <li>Cumplimiento con normativas de protección de datos como GDPR y CCPA.</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Compartición de datos</h4>
+                  <p className={`mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    No vendemos tus datos personales a terceros. Compartimos información únicamente en los siguientes casos:
+                  </p>
+                  <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'} space-y-3`}>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Proveedores de servicios</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Con proveedores que nos ayudan a proporcionar nuestros servicios (almacenamiento en la nube, procesamiento de pagos, etc.) bajo estrictas obligaciones de confidencialidad.
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Requisitos legales</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Cuando estamos obligados por ley o en respuesta a procedimientos legales válidos, como una orden judicial.
+                      </p>
+                    </div>
+                    <div>
+                      <p className={`font-medium ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Con tu consentimiento</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Cuando nos has dado permiso explícito para compartir tus datos, como al conectar servicios bancarios de terceros.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Tus derechos</h4>
+                  <p className={`mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Dependiendo de tu ubicación, puedes tener los siguientes derechos:
+                  </p>
+                  <ul className={`space-y-1 ml-4 list-disc ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    <li>Acceder a tus datos personales</li>
+                    <li>Corregir datos inexactos</li>
+                    <li>Eliminar tus datos personales</li>
+                    <li>Oponerte al procesamiento de tus datos</li>
+                    <li>Solicitar la portabilidad de tus datos</li>
+                    <li>Retirar tu consentimiento para el procesamiento de datos</li>
+                  </ul>
+                  <p className={`mt-3 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Para ejercer estos derechos, contacta con nuestro equipo de privacidad a través del Centro de Ayuda.
+                  </p>
+                </section>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowPrivacyPolicyModal(false)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium
+                  ${darkMode
+                    ? 'bg-cyan-700 text-white hover:bg-cyan-600'
+                    : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Centro de Ayuda */}
+        {showHelpCenterModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity" onClick={() => setShowHelpCenterModal(false)}></div>
+            <div className={`relative w-full max-w-3xl p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className={`text-xl font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Centro de Ayuda - Seguridad
+                </h3>
+                <button 
+                  onClick={() => setShowHelpCenterModal(false)}
+                  className={`p-1.5 rounded-lg ${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  <MdClose className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Preguntas frecuentes sobre seguridad</h4>
+                  
+                  <div className="space-y-4 mt-3">
+                    <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <h5 className={`font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>¿Cómo puedo cambiar mi contraseña?</h5>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Para cambiar tu contraseña, ve a la sección "Contraseña" en la página de Seguridad, haz clic en el botón de edición e ingresa tu contraseña actual. Te enviaremos un enlace para establecer una nueva contraseña a tu correo electrónico.
+                      </p>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <h5 className={`font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>¿Qué hago si detecto actividad sospechosa en mi cuenta?</h5>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Si detectas actividad sospechosa:
+                      </p>
+                      <ol className={`list-decimal ml-5 mt-2 text-sm space-y-1 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        <li>Cambia inmediatamente tu contraseña</li>
+                        <li>Revisa y cierra todas las sesiones activas desconocidas</li>
+                        <li>Activa la autenticación de dos factores si no lo has hecho</li>
+                        <li>Contacta con nuestro equipo de soporte para reportar el incidente</li>
+                      </ol>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <h5 className={`font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>¿Cómo funciona la autenticación de dos factores?</h5>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        La autenticación de dos factores (2FA) añade una capa adicional de seguridad a tu cuenta. Después de ingresar tu contraseña, recibirás un código único a través de correo electrónico o SMS (según tu configuración) que deberás introducir para completar el inicio de sesión.
+                      </p>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <h5 className={`font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>¿Qué debo hacer si pierdo el acceso a mi método de 2FA?</h5>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Si has perdido acceso a tu método de 2FA (cambio de número de teléfono o acceso al correo), puedes usar uno de los códigos de respaldo generados cuando activaste el 2FA. Si tampoco tienes acceso a estos códigos, contacta con nuestro equipo de soporte con tu identificación para verificar tu identidad.
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <section className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <h4 className={`text-lg font-medium mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Contactar con soporte</h4>
+                  
+                  <p className={`mb-4 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Si tienes problemas relacionados con la seguridad de tu cuenta, nuestro equipo especializado está disponible para ayudarte:
+                  </p>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-white'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Correo electrónico</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        seguridad@plutus.com
+                      </p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Tiempo de respuesta: 24-48 horas
+                      </p>
+                    </div>
+                    
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-white'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Chat en vivo</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Disponible en la app de lunes a viernes
+                      </p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Horario: 9:00 - 18:00 (GMT+1)
+                      </p>
+                    </div>
+                    
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-white'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Teléfono (incidentes urgentes)</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        +34 900 123 456
+                      </p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Horario: 24/7 para emergencias de seguridad
+                      </p>
+                    </div>
+                    
+                    <div className={`p-3 rounded-lg border ${darkMode ? 'border-gray-600 bg-gray-700/50' : 'border-gray-200 bg-white'}`}>
+                      <p className={`font-medium mb-1 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Centro de ayuda</p>
+                      <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        help.plutus.com/security
+                      </p>
+                      <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Base de conocimientos y guías detalladas
+                      </p>
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <h4 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Reportar un problema de seguridad</h4>
+                  
+                  <p className={`mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                    Si has descubierto una vulnerabilidad de seguridad en nuestra plataforma, te agradecemos que nos la comuniques de manera responsable:
+                  </p>
+                  
+                  <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <h5 className={`font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>Programa de recompensas por bugs</h5>
+                    <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      En Plutus valoramos la seguridad y animamos a investigadores de seguridad a reportar vulnerabilidades a través de nuestro programa de recompensas.
+                    </p>
+                    <p className={`text-sm mt-2 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      Envía los detalles de cualquier vulnerabilidad a: <span className="font-medium">security-bugs@plutus.com</span>
+                    </p>
+                    <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Incluye pasos para reproducir el problema, posible impacto y, si es posible, sugerencias para solucionarlo.
+                    </p>
+                  </div>
+                </section>
+              </div>
+
+              <div className="mt-6 flex justify-between">
+                <button
+                  onClick={() => {
+                    // Simular apertura de chat o formulario de contacto
+                    alert("Esta función conectaría con el servicio de chat en vivo.");
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium
+                  ${darkMode
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                >
+                  Contactar ahora
+                </button>
+                
+                <button
+                  onClick={() => setShowHelpCenterModal(false)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium
+                  ${darkMode
+                    ? 'bg-cyan-700 text-white hover:bg-cyan-600'
+                    : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Cerrar
                 </button>
               </div>
             </div>
