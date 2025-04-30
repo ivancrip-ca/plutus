@@ -3,14 +3,10 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  MdLock,
   MdEdit,
-  MdSave,
   MdCancel,
   MdSecurity,
-  MdPhoneAndroid,
   MdPassword,
-  MdDeleteForever,
   MdWarning,
   MdCheck,
   MdClose,
@@ -22,7 +18,6 @@ import { useAuth } from '../../../../app/contexts/AuthContext';
 import { NotificationContext } from '../../../../app/contexts/NotificationContext';
 import { auth, db } from '../../../../app/firebase';
 import {
-  updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
   sendEmailVerification,

@@ -108,7 +108,7 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
             {/* Mobile menu button */}
             <button
               type="button"
-              className={`inline-flex md:hidden items-center justify-center p-2 rounded-md ${
+              className={`cursor-pointer inline-flex md:hidden items-center justify-center p-2 rounded-md ${
                 darkMode ? 'text-gray-300 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
               } focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500`}
               onClick={toggleSidebar}
@@ -117,21 +117,7 @@ const DashboardHeader = ({ toggleSidebar, user, userData }) => {
               <MdMenu className="block h-6 w-6" />
             </button>
             
-            {/* Search input */}
-            <div className="hidden md:block ml-4">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MdSearch className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
-                </div>
-                <input
-                  className={`block w-full pl-10 pr-3 py-2 border ${
-                    darkMode ? 'border-gray-700 bg-gray-700 placeholder-gray-400 text-white' : 'border-gray-200 bg-gray-50 placeholder-gray-500'
-                  } rounded-md leading-5 focus:outline-none focus:placeholder-gray-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 sm:text-sm`}
-                  placeholder="Buscar transacciones, categorías..."
-                  type="search"
-                />
-              </div>
-            </div>
+            
           </div>
           
           <div className="flex items-center">

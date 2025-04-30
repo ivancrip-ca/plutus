@@ -211,7 +211,7 @@ const DashboardSidebar = ({
           {/* Close button */}
           <div className="absolute top-0 right-0 -mr-12 pt-2">
             <button
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white bg-gray-800 bg-opacity-25 transition-transform hover:scale-110 duration-200"
+              className="cursor-pointer ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white bg-gray-800 bg-opacity-25 transition-transform hover:scale-110 duration-200"
               onClick={() => setSidebarOpen(false)}
             >
               <span className="sr-only">Cerrar barra lateral</span>
