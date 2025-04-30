@@ -546,7 +546,7 @@ const SecurityPage = () => {
                           : 'bg-cyan-600 text-white hover:bg-cyan-700'
                         } transition-colors duration-150`}
                     >
-                      Cambiar Contraseña
+                      Cambiar contraseña
                     </button>
                   </div>
                 </form>
@@ -1073,7 +1073,7 @@ const SecurityPage = () => {
             <div className={`relative w-full max-w-3xl p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className={`text-xl font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Buenas Prácticas de Seguridad
+                  Buenas prácticas de seguridad
                 </h3>
                 <button 
                   onClick={() => setShowSecurityPracticesModal(false)}
@@ -1176,7 +1176,7 @@ const SecurityPage = () => {
             <div className={`relative w-full max-w-3xl p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className={`text-xl font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Política de Privacidad
+                  Política de privacidad
                 </h3>
                 <button 
                   onClick={() => setShowPrivacyPolicyModal(false)}
@@ -1294,7 +1294,7 @@ const SecurityPage = () => {
             <div className={`relative w-full max-w-3xl p-6 rounded-lg shadow-xl ${darkMode ? 'bg-gray-800' : 'bg-white'} max-h-[90vh] overflow-y-auto`}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className={`text-xl font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Centro de Ayuda - Seguridad
+                  Centro de ayuda - Seguridad
                 </h3>
                 <button 
                   onClick={() => setShowHelpCenterModal(false)}
