@@ -76,7 +76,7 @@ const ForgotPasswordPage = () => {
             <header className="py-4 px-6 flex justify-between items-center bg-white sticky top-0 z-50 shadow-sm">
                 <Link href="/" className="flex items-center">
                     <MdAccountBalance className="h-8 w-8 text-cyan-500 mr-2" />
-                    <span className="text-xl font-bold">Plutus</span>
+                    <span className="text-xl font-bold text-black">Plutus</span>
                 </Link>
                 
                 <div className="flex items-center space-x-2">
@@ -191,7 +191,7 @@ const ForgotPasswordPage = () => {
                     <div className="flex justify-between flex-col md:flex-row items-center">
                         <div className="flex items-center mb-6 md:mb-0">
                             <MdAccountBalance className="h-8 w-8 text-cyan-500 mr-2" />
-                            <span className="text-xl font-bold">Plutus</span>
+                            <span className="text-xl font-bold text-black">Plutus</span>
                         </div>
                         
                         <div className="text-sm text-gray-600">
