@@ -898,7 +898,7 @@ const PageAccounts = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Cuenta de Efectivo (siempre presente) */}
-          <div className={`p-6 rounded-xl shadow-sm transition-all duration-300 ${
+          <Link href="/dashboard/accounts/efectivo" className={`block p-6 rounded-xl shadow-sm transition-all duration-300 ${
             darkMode ? 'bg-gray-800 border border-gray-700 hover:border-gray-600' : 'bg-white border border-gray-100 hover:border-gray-300'
           }`}>
             <div className="flex items-start justify-between">
@@ -931,38 +931,43 @@ const PageAccounts = () => {
                           }`}>
                           No has registrado transacciones en efectivo aún. 
                           <br/>
-                          <Link href="/dashboard/transactions" className={`font-medium mt-1 inline-block ${
+                          <span className={`font-medium mt-1 inline-block ${
                             darkMode ? 'text-blue-400' : 'text-blue-600'
                           } hover:underline`}>
                             Registra tu primera transacción →
-                          </Link>
+                          </span>
                           </div>
                         )}
-                        </div>
-                      </div>
-                      
-                      {/* Botones de acción */}
+                </div>
+             </div>
+             
+             {/* Botones de acción */}
             <div className="mt-6 flex justify-between items-center">
               <button 
-                onClick={() => setIsEfectivoModalOpen(true)}
+                onClick={(e) => {
+                  e.preventDefault(); // Evitar que el Link se active
+                  setIsEfectivoModalOpen(true);
+                }}
                 className={`px-3 py-1.5 text-xs font-medium rounded ${
                   darkMode 
                     ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Ver detalles
+                Configurar
               </button>
-    
+              <div className={`text-xs ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                Ver transacciones →
+              </div>
             </div>
-          </div>
+          </Link>
           
-          {/* Mostrar solo las últimas 6 cuentas registradas */}
+          {/* Mostrar solo las últimas 5 cuentas registradas */}
           {accounts.slice(0, 5).map((account) => (
-            <div 
+            <Link 
               key={account.id} 
-              onClick={() => setSelectedAccount(account)}
-              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-white border-gray-100 hover:shadow-md'} rounded-xl shadow-sm border p-4 cursor-pointer transition-shadow`}
+              href={`/dashboard/accounts/${account.id}`}
+              className={`${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-white border-gray-100 hover:shadow-md'} rounded-xl shadow-sm border p-4 cursor-pointer transition-shadow block`}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center">
@@ -977,7 +982,10 @@ const PageAccounts = () => {
                 <div className="relative" ref={menuRef}>
                   <button 
                     className={`${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
-                    onClick={(e) => handleOptionsClick(e, account.id)}
+                    onClick={(e) => {
+                      e.preventDefault(); // Evitar que el Link se active
+                      handleOptionsClick(e, account.id);
+                    }}
                   >
                     <MoreVertical className="h-5 w-5 cursor-pointer" />
                   </button>
@@ -997,13 +1005,19 @@ const PageAccounts = () => {
                       <div className="py-1">
                         <button 
                           className={`w-full text-left px-4 py-2 cursor-pointer text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-700 hover:bg-gray-100'} transition-colors duration-200 ease-in-out`}
-                          onClick={() => handleEditAccount(account)}
+                          onClick={(e) => {
+                            e.preventDefault(); // Evitar que el Link se active
+                            handleEditAccount(account);
+                          }}
                         >
                           Editar cuenta
                         </button>
                         <button 
                           className={`w-full text-left px-4 py-2 cursor-pointer text-sm ${darkMode ? 'text-red-300 hover:bg-red-900 hover:bg-opacity-30' : 'text-red-600 hover:bg-red-50'} transition-colors duration-200 ease-in-out`}
-                          onClick={() => showDeleteConfirmation(account)}
+                          onClick={(e) => {
+                            e.preventDefault(); // Evitar que el Link se active
+                            showDeleteConfirmation(account);
+                          }}
                         >
                           Eliminar cuenta
                         </button>
@@ -1017,11 +1031,16 @@ const PageAccounts = () => {
                 <div className={`text-xl font-bold ${account.balance < 0 ? 'text-red-500' : darkMode ? 'text-white' : 'text-gray-900'}`}>
                   ${Math.abs(account.balance).toLocaleString('en-US', {minimumFractionDigits: 2})}
                 </div>
-                <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
-                  {account.type === 'credit' ? `Límite: $${account.limit?.toLocaleString('en-US') || '0.00'}` : 'Disponible'}
+                <div className="flex justify-between items-center">
+                  <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
+                    {account.type === 'credit' ? `Límite: $${account.limit?.toLocaleString('en-US') || '0.00'}` : 'Disponible'}
+                  </div>
+                  <div className={`text-xs ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                    Ver transacciones →
+                  </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
           
           {/* Add Account Card */}

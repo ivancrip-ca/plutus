@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   MdDashboard, MdAccountBalance, MdAttachMoney, MdTrendingUp,
   MdPieChart, MdSettings, MdLogout, MdClose, MdExpandMore,
-  MdExpandLess, MdCloud, MdPeople, MdPerson, MdSecurity, MdHelp
+  MdExpandLess, MdCloud, MdPeople, MdPerson, MdSecurity, MdHelp,
+  MdChevronLeft, MdChevronRight, MdMenu
 } from 'react-icons/md';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -49,6 +50,7 @@ const DashboardSidebar = ({
     budget: '/dashboard/budget',
     reports: '/dashboard/reports',
     cloud: '/dashboard/cloud',
+    settings: '/dashboard/configuracion', // Añadido ruta para settings
     user_settings: '/dashboard/configuracion/perfil',
     user_management: '/dashboard/configuracion/gestion_usuarios',
     security: '/dashboard/configuracion/seguridad',
@@ -263,62 +265,113 @@ const DashboardSidebar = ({
         </div>
       </div>
       
-      {/* Desktop sidebar (always visible) */}
+      {/* Desktop sidebar (collapsible) */}
       <div className="hidden md:flex md:flex-shrink-0">
-        <div className="flex flex-col w-64">
-          <div className={`flex flex-col h-0 flex-1 ${colors.sidebar}`}>
+        <div className={`flex flex-col ${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 ease-in-out`}>
+          <div className={`flex flex-col h-0 flex-1 ${colors.sidebar} relative`}>
+            {/* Toggle button for desktop */}
+            <button
+              className={`cursor-pointer absolute top-5 -right-4 w-8 h-8 rounded-full ${colors.navItemActive} flex items-center justify-center shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 z-10`}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              {sidebarOpen ? 
+                <MdChevronLeft className={`h-5 w-5 ${colors.sidebarText}`} /> : 
+                <MdChevronRight className={`h-5 w-5 ${colors.sidebarText}`} />
+              }
+            </button>
+            
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               {/* Brand/logo */}
               <div className="flex items-center flex-shrink-0 px-4 py-4">
-                <h1 className={`text-2xl font-bold ${colors.sidebarText}`}>Plutus</h1>
+                {sidebarOpen ? (
+                  <h1 className={`text-2xl font-bold ${colors.sidebarText}`}>Plutus</h1>
+                ) : (
+                  <div className={`h-8 w-8 mx-auto ${colors.sidebarText}`}>
+                    <h1 className={`text-3xl font-bold text-center ${colors.sidebarText}`}>P</h1>
+                  </div>
+                )}
               </div>
               
               {/* User info */}
               <div className={`flex-shrink-0 flex flex-col items-center px-4 py-4 border-t border-b ${colors.border}`}>
-                <div className="relative w-16 h-16 rounded-full overflow-hidden mb-2">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden mb-2">
                   <Image
                     src={userPhoto}
                     alt={userName}
-                    width={64}
-                    height={64}
+                    width={48}
+                    height={48}
                     className="object-cover w-full h-full"
                     onError={handleImageError}
                   />
                 </div>
-                <div className="text-center">
-                  <p className={`text-sm font-medium ${colors.sidebarText}`}>{userName}</p>
-                  <p className={`text-xs ${colors.sidebarSubtext} truncate`}>{userEmail}</p>
-                  <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium ${colors.badgeBg} ${colors.badgeText}`}>
-                    {registrationMethod}
-                  </span>
-                </div>
+                {sidebarOpen && (
+                  <div className="text-center">
+                    <p className={`text-sm font-medium ${colors.sidebarText}`}>{userName}</p>
+                    <p className={`text-xs ${colors.sidebarSubtext} truncate`}>{userEmail}</p>
+                    <span className={`inline-flex items-center px-2 py-0.5 mt-1 rounded-full text-xs font-medium ${colors.badgeBg} ${colors.badgeText}`}>
+                      {registrationMethod}
+                    </span>
+                  </div>
+                )}
               </div>
               
               {/* Navigation */}
-              <nav className="mt-6 flex-1 px-3 space-y-3">
-                {navItems.map(item => renderNavItem(item))}
+              <nav className="mt-6 flex-1 px-2 space-y-3">
+                {navItems.map(item => 
+                  sidebarOpen ? renderNavItem(item) : (
+                    <Link
+                      key={item.id}
+                      href={sectionToPath[item.id]}
+                      onClick={() => {
+                        setActiveSection(item.id);
+                      }}
+                      className={`${
+                        activeSection === item.id || (item.hasSubmenu && item.submenu.some(sub => activeSection === sub.id))
+                          ? colors.navItemActive + ' ' + colors.sidebarText
+                          : colors.sidebarSubtext + ' ' + colors.navItemHover
+                      } group flex flex-col items-center justify-center py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150`}
+                      title={item.name}
+                    >
+                      <div className={`flex-shrink-0 ${colors.iconColor}`}>{item.icon}</div>
+                    </Link>
+                  )
+                )}
                 
                 {/* Logout button */}
-                <button
-                  onClick={handleLogout}
-                  className={`mt-6 ${colors.sidebarSubtext} ${colors.navItemHover} group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
-                >
-                  <div className={`mr-3 flex-shrink-0 ${colors.iconColor}`}>
-                    <MdLogout className="w-6 h-6" />
-                  </div>
-                  Cerrar sesión
-                </button>
+                {sidebarOpen ? (
+                  <button
+                    onClick={handleLogout}
+                    className={`mt-6 ${colors.sidebarSubtext} ${colors.navItemHover} group flex items-center px-3 py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
+                  >
+                    <div className={`mr-3 flex-shrink-0 ${colors.iconColor}`}>
+                      <MdLogout className="w-6 h-6" />
+                    </div>
+                    Cerrar sesión
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleLogout}
+                    className={`mt-6 ${colors.sidebarSubtext} ${colors.navItemHover} group flex flex-col items-center justify-center py-3 text-sm font-medium rounded-md cursor-pointer transition-colors duration-150 w-full`}
+                    title="Cerrar sesión"
+                  >
+                    <div className={`flex-shrink-0 ${colors.iconColor}`}>
+                      <MdLogout className="w-6 h-6" />
+                    </div>
+                  </button>
+                )}
               </nav>
             </div>
             
             {/* Version info */}
-            <div className={`flex-shrink-0 flex border-t ${colors.borderBottom} p-4`}>
-              <div className="flex-shrink-0 w-full group block">
-                <p className={`text-xs ${colors.sidebarSubtext} text-center`}>
-                  Plutus v1.0.0
-                </p>
+            {sidebarOpen && (
+              <div className={`flex-shrink-0 flex border-t ${colors.borderBottom} p-4`}>
+                <div className="flex-shrink-0 w-full group block">
+                  <p className={`text-xs ${colors.sidebarSubtext} text-center`}>
+                    Plutus v1.0.0
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { 
   HelpCircle, 
@@ -11,7 +11,11 @@ import {
   Book, 
   Video, 
   FileText, 
-  Star
+  Star,
+  CheckCircle,
+  Facebook,
+  Send,
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -20,8 +24,26 @@ const AyudaPage = () => {
   const [activeCategory, setActiveCategory] = useState('general');
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [supportMenuOpen, setSupportMenuOpen] = useState(false);
+  const supportMenuRef = useRef(null);
 
-  // Categorías de ayuda
+  // Cerrar el menú de soporte cuando se hace clic fuera de él
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (supportMenuRef.current && !supportMenuRef.current.contains(event.target)) {
+        setSupportMenuOpen(false);
+      }
+    }
+    
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [supportMenuRef]);
+
   const categories = [
     { id: 'general', name: 'General', icon: <HelpCircle className="h-4 w-4" /> },
     { id: 'cuentas', name: 'Cuentas', icon: <FileText className="h-4 w-4" /> },
@@ -31,7 +53,6 @@ const AyudaPage = () => {
     { id: 'tutoriales', name: 'Tutoriales', icon: <Video className="h-4 w-4" /> },
   ];
 
-  // Preguntas frecuentes por categoría
   const faqsByCategory = {
     general: [
       {
@@ -127,7 +148,6 @@ const AyudaPage = () => {
     ]
   };
 
-  // Filtrar preguntas por búsqueda
   const filteredFaqs = searchQuery
     ? Object.values(faqsByCategory).flat().filter(faq =>
         faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -135,21 +155,30 @@ const AyudaPage = () => {
       )
     : faqsByCategory[activeCategory];
 
+  const handleRating = (rating) => {
+    setSelectedRating(rating);
+    setFeedbackSubmitted(true);
+    
+    console.log(`Usuario ha valorado con ${rating} estrellas`);
+    
+    setTimeout(() => {
+      setFeedbackSubmitted(false);
+    }, 3000);
+  };
+
   return (
     <div className={`p-6 min-h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
       <div className="max-w-6xl mx-auto">
-        {/* Encabezado */}
         <div className="mb-8">
           <h1 className={`text-3xl font-bold flex items-center gap-2 mb-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
             <HelpCircle className="h-8 w-8 text-blue-500" />
-            Centro de Ayuda
+            Centro de ayuda
           </h1>
           <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
             Encuentra respuestas a tus preguntas sobre Plutus y aprende a gestionar mejor tus finanzas.
           </p>
         </div>
 
-        {/* Barra de búsqueda */}
         <div className="mb-8">
           <div className={`flex items-center p-3 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} focus-within:ring-2 focus-within:ring-blue-500 shadow-sm`}>
             <Search className={`h-5 w-5 mr-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
@@ -164,7 +193,6 @@ const AyudaPage = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Navegación lateral */}
           <div className="md:col-span-1">
             <div className={`rounded-lg ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border p-4 sticky top-6`}>
               <h2 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Categorías</h2>
@@ -176,7 +204,7 @@ const AyudaPage = () => {
                       setActiveCategory(category.id);
                       setSearchQuery('');
                     }}
-                    className={`w-full flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
+                    className={`cursor-pointer w-full flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
                       activeCategory === category.id
                         ? `${darkMode ? 'bg-blue-900 bg-opacity-50 text-blue-300' : 'bg-blue-50 text-blue-700'}`
                         : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100'}`
@@ -191,20 +219,63 @@ const AyudaPage = () => {
               <div className={`mt-6 pt-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                 <h3 className={`text-sm font-medium mb-3 ${darkMode ? 'text-white' : 'text-gray-800'}`}>¿Necesitas más ayuda?</h3>
                 <div className="space-y-2">
-                  <Link href="#" className={`flex items-center px-3 py-2 text-sm rounded-md ${darkMode ? 'text-blue-400 hover:bg-gray-700' : 'text-blue-600 hover:bg-gray-100'}`}>
+                  <Link 
+                    href="https://wa.me/1234567890?text=Hola,%20necesito%20ayuda%20con%20Plutus" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className={`flex items-center px-3 py-2 text-sm rounded-md ${darkMode ? 'text-green-400 hover:bg-gray-700' : 'text-green-600 hover:bg-gray-100'}`}
+                  >
                     <MessageCircle className="h-4 w-4 mr-2" />
-                    Chat en vivo
+                    Chat en vivo (WhatsApp)
                   </Link>
-                  <Link href="#" className={`flex items-center px-3 py-2 text-sm rounded-md ${darkMode ? 'text-blue-400 hover:bg-gray-700' : 'text-blue-600 hover:bg-gray-100'}`}>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Contactar soporte
-                  </Link>
+                  
+                  <div className="relative" ref={supportMenuRef}>
+                    <button 
+                      onClick={() => setSupportMenuOpen(!supportMenuOpen)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-md ${darkMode ? 'text-blue-400 hover:bg-gray-700' : 'text-blue-600 hover:bg-gray-100'}`}
+                    >
+                      <span className="flex items-center">
+                        <Mail className="h-4 w-4 mr-2" />
+                        Contactar soporte
+                      </span>
+                      <ChevronRight className={`h-4 w-4 transition-transform ${supportMenuOpen ? 'rotate-90' : ''}`} />
+                    </button>
+                    
+                    {supportMenuOpen && (
+                      <div className={`absolute left-0 mt-1 w-full rounded-md shadow-lg py-1 z-10 ${darkMode ? 'bg-gray-700 border border-gray-600' : 'bg-white border border-gray-200'}`}>
+                        <Link 
+                          href="mailto:soporte@plutus.com" 
+                          className={`flex items-center px-4 py-2 text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          Correo electrónico
+                        </Link>
+                        <Link 
+                          href="https://facebook.com/plutusapp" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className={`flex items-center px-4 py-2 text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          <Facebook className="h-4 w-4 mr-2" />
+                          Facebook
+                        </Link>
+                        <Link 
+                          href="https://wa.me/1234567890" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className={`flex items-center px-4 py-2 text-sm ${darkMode ? 'text-gray-200 hover:bg-gray-600' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          WhatsApp
+                        </Link>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Contenido principal */}
           <div className="md:col-span-3">
             <div className={`rounded-lg ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border p-6`}>
               {searchQuery ? (
@@ -272,7 +343,6 @@ const AyudaPage = () => {
               )}
             </div>
 
-            {/* Recursos adicionales */}
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className={`rounded-lg border p-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                 <div className="flex items-start">
@@ -284,7 +354,7 @@ const AyudaPage = () => {
                     <p className={`text-sm mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       Explora nuestras guías detalladas sobre gestión financiera
                     </p>
-                    <Link href="#" className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                    <Link href="/dashboard/configuracion/ayuda/guias-recursos" className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                       Ver recursos →
                     </Link>
                   </div>
@@ -300,7 +370,7 @@ const AyudaPage = () => {
                     <p className={`text-sm mb-3 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       Aprende a utilizar todas las funciones de Plutus con nuestros tutoriales
                     </p>
-                    <Link href="#" className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                    <Link href="/dashboard/configuracion/ayuda/videotutoriales" className={`text-sm font-medium ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                       Ver videos →
                     </Link>
                   </div>
@@ -308,22 +378,52 @@ const AyudaPage = () => {
               </div>
             </div>
 
-            {/* Sección de valoración */}
             <div className={`mt-8 p-6 rounded-lg text-center ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'} border`}>
-              <h3 className={`font-medium mb-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>¿Te fue útil esta información?</h3>
-              <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Ayúdanos a mejorar nuestro centro de ayuda con tus comentarios
-              </p>
-              <div className="flex justify-center space-x-2">
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <button 
-                    key={rating}
-                    className={`p-2 rounded-full hover:bg-opacity-10 ${darkMode ? 'hover:bg-yellow-500' : 'hover:bg-yellow-200'}`}
-                  >
-                    <Star className={`h-6 w-6 ${darkMode ? 'text-gray-400 hover:text-yellow-300' : 'text-gray-300 hover:text-yellow-400'}`} />
-                  </button>
-                ))}
-              </div>
+              {feedbackSubmitted ? (
+                <div className="py-2">
+                  <div className="flex justify-center mb-3">
+                    <CheckCircle className={`h-12 w-12 ${darkMode ? 'text-green-400' : 'text-green-500'}`} />
+                  </div>
+                  <h3 className={`font-medium ${darkMode ? 'text-white' : 'text-gray-800'}`}>¡Gracias por tu valoración!</h3>
+                  <p className={`text-sm mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {selectedRating >= 4 
+                      ? "Nos alegra que hayas encontrado útil nuestra información."
+                      : "Trabajaremos para mejorar nuestro contenido según tus comentarios."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <h3 className={`font-medium mb-2 ${darkMode ? 'text-white' : 'text-gray-800'}`}>¿Te fue útil esta información?</h3>
+                  <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Ayúdanos a mejorar nuestro centro de ayuda con tus comentarios
+                  </p>
+                  <div className="flex justify-center space-x-2">
+                    {[1, 2, 3, 4, 5].map((rating) => (
+                      <button 
+                        key={rating}
+                        onClick={() => handleRating(rating)}
+                        onMouseEnter={() => setHoveredRating(rating)}
+                        onMouseLeave={() => setHoveredRating(0)}
+                        className={`p-2 rounded-full transition-all duration-150 ${
+                          darkMode 
+                            ? 'hover:bg-gray-700' 
+                            : 'hover:bg-gray-100'
+                        }`}
+                        aria-label={`Valorar con ${rating} estrellas`}
+                      >
+                        <Star 
+                          className={`h-6 w-6 transition-colors ${
+                            rating <= (hoveredRating || selectedRating)
+                              ? (darkMode ? 'text-yellow-300' : 'text-yellow-400') 
+                              : (darkMode ? 'text-gray-600' : 'text-gray-300')
+                          } ${hoveredRating && hoveredRating >= rating ? 'scale-110' : ''}`} 
+                          fill={rating <= (hoveredRating || selectedRating) ? (darkMode ? '#fcd34d' : '#fbbf24') : 'none'}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

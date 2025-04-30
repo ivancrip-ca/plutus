@@ -11,8 +11,34 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const { currentUser, userData } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Por defecto abierto en pantallas grandes
+  const [isMobile, setIsMobile] = useState(false);
   const [activeSection, setActiveSection] = useState('overview');
+  
+  // Effect para detectar si estamos en un dispositivo móvil
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      
+      // Si es móvil, ocultar el sidebar por defecto
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+    
+    // Ejecutar al inicio
+    checkIfMobile();
+    
+    // Agregar event listener para el resize de la ventana
+    window.addEventListener('resize', checkIfMobile);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
   
   // Detectar sección activa basada en la ruta
   useEffect(() => {

@@ -1305,6 +1305,27 @@ export default function TransactionsPage() {
     }
   }, [userAccounts]);
 
+  // Efecto para detectar parámetros URL para filtrar transacciones por cuenta
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const accountParam = urlParams.get('cuenta');
+      const accountIdParam = urlParams.get('cuentaId');
+      
+      if (accountParam) {
+        // Si tenemos el parámetro 'cuenta', filtrar por nombre de cuenta
+        setSearchTerm(accountParam);
+      } else if (accountIdParam) {
+        // Si tenemos el parámetro 'cuentaId', filtrar por ID de cuenta
+        // Buscar la cuenta correspondiente en userAccounts
+        const cuenta = userAccounts.find(acc => acc.id === accountIdParam);
+        if (cuenta) {
+          setSearchTerm(cuenta.name || cuenta.institution || 'Cuenta');
+        }
+      }
+    }
+  }, [userAccounts]);
+
   // Asegurar que el componente está montado antes de renderizar elementos dependientes del tema
   useEffect(() => {
     setMounted(true);
