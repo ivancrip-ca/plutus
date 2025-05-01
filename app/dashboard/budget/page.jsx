@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdWarning, MdArrowUpward, MdArrowDownward } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdWarning, MdArrowUpward, MdArrowDownward, MdPictureAsPdf } from 'react-icons/md';
 import { useTheme } from '../../../app/contexts/ThemeContext';
 import { useAuth } from '../../../app/contexts/AuthContext';
 import { db } from '../../../app/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { jsPDF } from 'jspdf';
 
 // Registrar los componentes necesarios de Chart.js
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -24,17 +25,43 @@ const BudgetPage = () => {
   const [budgets, setBudgets] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [budgetToDelete, setBudgetToDelete] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
 
   const [formData, setFormData] = useState({
+    // Encabezado
+    budgetNumber: '',
+    issueDate: new Date().toISOString().split('T')[0],
+    expiryDate: '',
+    
+    // Datos del cliente
+    clientName: '',
+    clientAddress: '',
+    clientContact: '',
+    
+    // Información del presupuesto
     category: '',
+    description: '',
     limit: '',
     period: 'Mensual',
     startDate: '',
     endDate: '',
-    description: '',
     color: 'bg-blue-500',
     status: 'activo',
-    spent: '0'  // Inicializamos spent con un valor por defecto
+    spent: '0',
+    
+    // Condiciones
+    paymentTerms: '',
+    deliveryTime: '',
+    warranty: '',
+    
+    // Notas adicionales
+    notes: '',
+    specialClauses: '',
+    
+    // Persona responsable
+    responsibleName: '',
+    responsibleContact: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -72,23 +99,62 @@ const BudgetPage = () => {
     }
   };
 
+  // Función para avanzar al siguiente paso del formulario
+  const nextStep = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  // Función para retroceder al paso anterior del formulario
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
   // Función para cerrar el modal
   const closeModal = () => {
     setShowAddModal(false);
     setEditingBudget(null);
     setError('');
     setSuccessMessage('');
+    setCurrentStep(1);
     // Resetear el formulario
     setFormData({
+      // Encabezado
+      budgetNumber: '',
+      issueDate: new Date().toISOString().split('T')[0],
+      expiryDate: '',
+      
+      // Datos del cliente
+      clientName: '',
+      clientAddress: '',
+      clientContact: '',
+      
+      // Información del presupuesto
       category: '',
+      description: '',
       limit: '',
       period: 'Mensual',
       startDate: '',
       endDate: '',
-      description: '',
       color: 'bg-blue-500',
       status: 'activo',
-      spent: '0'
+      spent: '0',
+      
+      // Condiciones
+      paymentTerms: '',
+      deliveryTime: '',
+      warranty: '',
+      
+      // Notas adicionales
+      notes: '',
+      specialClauses: '',
+      
+      // Persona responsable
+      responsibleName: '',
+      responsibleContact: '',
     });
   };
 
@@ -129,6 +195,18 @@ const BudgetPage = () => {
       // Crear el objeto del presupuesto para Firestore
       const newBudget = {
         userId: currentUser.uid,
+        
+        // Encabezado
+        budgetNumber: formData.budgetNumber || `BUD-${Date.now()}`, // Generar número automático si no se proporciona
+        issueDate: formData.issueDate,
+        expiryDate: formData.expiryDate,
+        
+        // Datos del cliente
+        clientName: formData.clientName,
+        clientAddress: formData.clientAddress,
+        clientContact: formData.clientContact,
+        
+        // Información del presupuesto
         category: formData.category,
         spent: 0, // Comienza en 0
         limit: Number(formData.limit),
@@ -138,6 +216,20 @@ const BudgetPage = () => {
         endDate: formData.endDate,
         description: formData.description,
         status: formData.status,
+        
+        // Condiciones
+        paymentTerms: formData.paymentTerms,
+        deliveryTime: formData.deliveryTime,
+        warranty: formData.warranty,
+        
+        // Notas adicionales
+        notes: formData.notes,
+        specialClauses: formData.specialClauses,
+        
+        // Persona responsable
+        responsibleName: formData.responsibleName,
+        responsibleContact: formData.responsibleContact,
+        
         createdAt: serverTimestamp()
       };
       
@@ -204,6 +296,17 @@ const BudgetPage = () => {
       
       // Crear el objeto de presupuesto actualizado
       const updatedBudget = {
+        // Encabezado
+        budgetNumber: formData.budgetNumber,
+        issueDate: formData.issueDate,
+        expiryDate: formData.expiryDate,
+        
+        // Datos del cliente
+        clientName: formData.clientName,
+        clientAddress: formData.clientAddress,
+        clientContact: formData.clientContact,
+        
+        // Información del presupuesto
         category: formData.category,
         limit: Number(formData.limit),
         spent: Number(formData.spent), // Actualizar el valor de spent
@@ -213,6 +316,20 @@ const BudgetPage = () => {
         endDate: formData.endDate,
         description: formData.description,
         status: formData.status,
+        
+        // Condiciones
+        paymentTerms: formData.paymentTerms,
+        deliveryTime: formData.deliveryTime,
+        warranty: formData.warranty,
+        
+        // Notas adicionales
+        notes: formData.notes,
+        specialClauses: formData.specialClauses,
+        
+        // Persona responsable
+        responsibleName: formData.responsibleName,
+        responsibleContact: formData.responsibleContact,
+        
         updatedAt: serverTimestamp()
       };
       
@@ -304,26 +421,416 @@ const BudgetPage = () => {
     }
   };
 
+  // Función para generar PDF del presupuesto con diseño moderno y profesional
+  const generatePDF = (budget) => {
+    // Crear un nuevo documento PDF
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    // Importar fuentes
+    doc.setFont('helvetica');
+    
+    // Definir colores principales
+    const primaryColor = '#0891b2'; // Color cyan para elementos principales
+    const secondaryColor = '#475569'; // Color slate para textos secundarios
+    const accentColor = '#6366f1'; // Color indigo para acentos
+    
+    // Medidas de la página
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    let y = 20; // Posición inicial en el eje Y
+    let currentPage = 1; // Contador de páginas
+    
+    // Función para añadir un rectángulo con color de fondo
+    const addColorRect = (y, height, color) => {
+      doc.setFillColor(color);
+      doc.rect(0, y, pageWidth, height, 'F');
+    };
+    
+    // Función para añadir la cabecera
+    const addHeader = () => {
+      // Fondo del encabezado
+      addColorRect(0, 40, primaryColor);
+      
+      // Título del documento
+      doc.setTextColor('#ffffff');
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text("PRESUPUESTO", pageWidth / 2, 20, { align: 'center' });
+      
+      // Subtítulo o eslogan
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text("Documento generado por Plutus - Sistema de Gestión Financiera", pageWidth / 2, 30, { align: 'center' });
+      
+      // Resetear texto a color por defecto
+      doc.setTextColor('#000000');
+      
+      return 45; // Retornar la nueva posición Y después del encabezado
+    };
+    
+    // Función para añadir sección con título
+    const addSection = (title, yPos) => {
+      // Barra coloreada antes del título de sección
+      doc.setFillColor(primaryColor);
+      doc.rect(margin, yPos, contentWidth, 0.5, 'F');
+      
+      yPos += 6;
+      
+      // Título de la sección
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(primaryColor);
+      doc.text(title, margin, yPos);
+      
+      // Resetear texto a color por defecto
+      doc.setTextColor('#000000');
+      
+      return yPos + 8;
+    };
+    
+    // Función para añadir campo de información
+    const addField = (label, value, yPos, labelWidth = 40) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(secondaryColor);
+      doc.text(label + ":", margin, yPos);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor('#000000');
+      if (value) {
+        // Si el valor es largo, dividirlo en múltiples líneas
+        if (value.length > 60) {
+          const splitValue = doc.splitTextToSize(value, contentWidth - labelWidth);
+          doc.text(splitValue, margin + labelWidth, yPos);
+          return yPos + (splitValue.length * 5);
+        } else {
+          doc.text(value, margin + labelWidth, yPos);
+          return yPos + 6;
+        }
+      }
+      return yPos + 6;
+    };
+    
+    // Función para añadir pie de página
+    const addFooter = (pageNum, totalPages) => {
+      // Línea separadora
+      doc.setDrawColor(primaryColor);
+      doc.setLineWidth(0.5);
+      doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
+      
+      // Texto del pie de página
+      doc.setFontSize(8);
+      doc.setTextColor(secondaryColor);
+      doc.text("© " + new Date().getFullYear() + " Plutus. Todos los derechos reservados.", margin, pageHeight - 20);
+      doc.text("Documento generado el " + new Date().toLocaleDateString(), pageWidth - margin, pageHeight - 20, { align: 'right' });
+      
+      // Agregar fecha actual
+      const fechaActual = "30 de abril de 2025";
+      doc.text(`Fecha de impresión: ${fechaActual}`, margin, pageHeight - 15);
+      
+      // Número de página
+      doc.setFontSize(8);
+      doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
+    };
+    
+    // Comprobar si hay espacio suficiente para el siguiente bloque
+    const checkPageBreak = (requiredSpace) => {
+      if (y + requiredSpace > pageHeight - 35) {
+        // Añadir pie de página a la página actual
+        addFooter(currentPage, 2);
+        
+        // Añadir nueva página
+        doc.addPage();
+        currentPage++;
+        
+        // Reiniciar posición Y y añadir encabezado ligero en la segunda página
+        y = 20;
+        
+        // Encabezado de segunda página más ligero
+        doc.setFillColor(primaryColor);
+        doc.rect(0, 0, pageWidth, 15, 'F');
+        
+        doc.setTextColor('#ffffff');
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Presupuesto - ${budget.category} (Continuación)`, pageWidth / 2, 10, { align: 'center' });
+        
+        doc.setTextColor('#000000');
+        y = 25;
+      }
+    };
+    
+    // Iniciar con el encabezado
+    y = addHeader();
+    
+    // Número y fecha del presupuesto - Info destacada
+    doc.setFillColor('#f8fafc'); // Fondo gris muy claro
+    doc.rect(margin, y, contentWidth, 20, 'F');
+    doc.setDrawColor(primaryColor);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, y, contentWidth, 20, 'S');
+    
+    doc.setFontSize(11);
+    doc.setTextColor(secondaryColor);
+    
+    // Lado izquierdo - Número
+    doc.setFont('helvetica', 'bold');
+    doc.text("Presupuesto N°:", margin + 5, y + 8);
+    doc.setTextColor('#000000');
+    doc.setFont('helvetica', 'normal');
+    doc.text(budget.budgetNumber || `BUD-${Date.now()}`, margin + 38, y + 8);
+    
+    // Lado derecho - Fechas
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(secondaryColor);
+    doc.text("Emisión:", pageWidth - margin - 75, y + 8);
+    doc.setTextColor('#000000');
+    doc.setFont('helvetica', 'normal');
+    doc.text(budget.issueDate || new Date().toLocaleDateString(), pageWidth - margin - 45, y + 8);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(secondaryColor);
+    doc.text("Válido hasta:", pageWidth - margin - 75, y + 15);
+    doc.setTextColor('#000000');
+    doc.setFont('helvetica', 'normal');
+    doc.text(budget.expiryDate || "No especificado", pageWidth - margin - 45, y + 15);
+    
+    y += 25;
+    
+    // Información del cliente
+    y = addSection("INFORMACIÓN DEL CLIENTE", y);
+    
+    if (budget.clientName || budget.clientAddress || budget.clientContact) {
+      // Recuadro para info del cliente
+      doc.setFillColor('#f8fafc');
+      doc.rect(margin, y, contentWidth, 24, 'F');
+      
+      y = addField("Cliente", budget.clientName || "No especificado", y + 6);
+      y = addField("Dirección", budget.clientAddress || "No especificada", y);
+      y = addField("Contacto", budget.clientContact || "No especificado", y);
+    } else {
+      doc.setFontSize(10);
+      doc.setTextColor(secondaryColor);
+      doc.text("No se ha especificado información del cliente", margin, y + 6);
+      y += 12;
+    }
+    
+    y += 10;
+    
+    // Detalles del presupuesto
+    y = addSection("DETALLE DEL PRESUPUESTO", y);
+    
+    // Recuadro para categoría y descripción
+    doc.setFillColor('#f8fafc');
+    doc.rect(margin, y, contentWidth, budget.description ? 30 : 18, 'F');
+    
+    y = addField("Categoría", budget.category, y + 6);
+    
+    if (budget.description) {
+      y = addField("Descripción", budget.description, y);
+    }
+    
+    y += 10;
+    
+    // Verificar espacio para la tabla e información financiera (aproximadamente 50mm)
+    checkPageBreak(50);
+    
+    // Tabla de información financiera
+    const tableY = y;
+    
+    // Encabezados de la tabla
+    doc.setFillColor(primaryColor);
+    doc.rect(margin, y, contentWidth, 8, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor('#ffffff');
+    doc.text("CONCEPTO", margin + 5, y + 5.5);
+    doc.text("PERÍODO", margin + 70, y + 5.5);
+    doc.text("VIGENCIA", margin + 110, y + 5.5);
+    doc.text("IMPORTE", pageWidth - margin - 25, y + 5.5, { align: 'right' });
+    
+    y += 8;
+    
+    // Datos de la tabla
+    doc.setFillColor('#f8fafc');
+    doc.rect(margin, y, contentWidth, 10, 'F');
+    
+    doc.setTextColor('#000000');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(budget.category, margin + 5, y + 6);
+    doc.text(budget.period || "No especificado", margin + 70, y + 6);
+    const vigencia = budget.startDate && budget.endDate ? 
+      `${budget.startDate} - ${budget.endDate}` : "No especificada";
+    doc.text(vigencia, margin + 110, y + 6);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(`$${budget.limit.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 
+      pageWidth - margin - 5, y + 6, { align: 'right' });
+    
+    y += 10;
+    
+    // Línea inferior de la tabla
+    doc.setDrawColor('#e2e8f0');
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, margin + contentWidth, y);
+    
+    y += 10;
+    
+    // Información de progreso/estado
+    if (typeof budget.spent === 'number') {
+      const percentage = Math.min(Math.round((budget.spent / budget.limit) * 100), 100);
+      
+      doc.setFontSize(9);
+      doc.setTextColor(secondaryColor);
+      doc.text("PROGRESO DE PRESUPUESTO:", margin, y + 6);
+      
+      // Barra de progreso
+      const barWidth = 60;
+      const barHeight = 5;
+      const barY = y + 10;
+      
+      // Fondo de la barra
+      doc.setFillColor('#e2e8f0');
+      doc.rect(margin + 70, barY, barWidth, barHeight, 'F');
+      
+      // Progreso de la barra
+      let progressColor = '#10b981'; // Verde por defecto
+      if (percentage > 75) progressColor = '#f59e0b'; // Amarillo
+      if (percentage > 100) progressColor = '#ef4444'; // Rojo
+      
+      doc.setFillColor(progressColor);
+      doc.rect(margin + 70, barY, (barWidth * percentage) / 100, barHeight, 'F');
+      
+      // Porcentaje y gasto
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(progressColor);
+      doc.text(`${percentage}%`, margin + 70 + barWidth + 5, barY + 4);
+      
+      doc.setTextColor('#000000');
+      doc.text(`Gastado: $${budget.spent.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 
+        pageWidth - margin - 5, barY + 4, { align: 'right' });
+      
+      y += 25;
+    }
+    
+    // Verificar si necesitamos cambiar de página para las condiciones (aproximadamente 60mm)
+    checkPageBreak(60);
+    
+    // Condiciones
+    if (budget.paymentTerms || budget.deliveryTime || budget.warranty) {
+      y = addSection("CONDICIONES", y);
+      
+      doc.setFillColor('#f8fafc');
+      doc.rect(margin, y, contentWidth, 24, 'F');
+      
+      y = addField("Forma de pago", budget.paymentTerms || "No especificada", y + 6);
+      y = addField("Tiempo de entrega", budget.deliveryTime || "No especificado", y);
+      y = addField("Garantía", budget.warranty || "No especificada", y);
+      
+      y += 10;
+    }
+    
+    // Verificar si necesitamos cambiar de página para las notas adicionales (aprox. 60mm)
+    checkPageBreak(60);
+    
+    // Notas adicionales
+    if (budget.notes || budget.specialClauses) {
+      y = addSection("NOTAS ADICIONALES", y);
+      
+      doc.setFillColor('#f8fafc');
+      doc.rect(margin, y, contentWidth, budget.notes && budget.specialClauses ? 40 : 25, 'F');
+      
+      if (budget.notes) {
+        y = addField("Observaciones", budget.notes, y + 6);
+        y += 5; // Añadir espacio adicional después de observaciones
+      }
+      
+      if (budget.specialClauses) {
+        y = addField("Cláusulas especiales", budget.specialClauses, y);
+      }
+      
+      y += 10;
+    }
+    
+    // Verificar si necesitamos cambiar de página para los datos del responsable (aprox. 50mm)
+    checkPageBreak(50);
+    
+    // Datos de responsable
+    if (budget.responsibleName || budget.responsibleContact) {
+      y = addSection("DATOS DEL RESPONSABLE", y);
+      
+      doc.setFillColor('#f8fafc');
+      doc.rect(margin, y, contentWidth, 20, 'F');
+      
+      y = addField("Nombre", budget.responsibleName || "No especificado", y + 6);
+      y = addField("Contacto", budget.responsibleContact || "No especificado", y);
+      
+      // Espacio para firma
+      y += 15;
+      doc.setDrawColor(secondaryColor);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, margin + 70, y);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(secondaryColor);
+      doc.text("Firma del responsable", margin, y + 5);
+      
+      y += 10;
+    }
+    
+    // Añadir pie de página a la última página
+    addFooter(currentPage, 2);
+    
+    // Guardar el PDF
+    doc.save(`presupuesto_${budget.category.replace(/\s+/g, '_').toLowerCase()}.pdf`);
+  };
+
   // Cargar los datos del presupuesto a editar cuando cambia editingBudget
   useEffect(() => {
     if (editingBudget) {
       setFormData({
-        category: editingBudget.category,
-        limit: editingBudget.limit.toString(),
-        period: editingBudget.period,
-        startDate: editingBudget.startDate,
-        endDate: editingBudget.endDate,
-        description: editingBudget.description,
-        color: editingBudget.color,
-        status: editingBudget.status,
-        spent: editingBudget.spent.toString() // Añadir el valor de gasto actual
+        // Encabezado
+        budgetNumber: editingBudget.budgetNumber || '',
+        issueDate: editingBudget.issueDate || new Date().toISOString().split('T')[0],
+        expiryDate: editingBudget.expiryDate || '',
+        
+        // Datos del cliente
+        clientName: editingBudget.clientName || '',
+        clientAddress: editingBudget.clientAddress || '',
+        clientContact: editingBudget.clientContact || '',
+        
+        // Información del presupuesto
+        category: editingBudget.category || '',
+        description: editingBudget.description || '',
+        limit: editingBudget.limit ? editingBudget.limit.toString() : '',
+        period: editingBudget.period || 'Mensual',
+        startDate: editingBudget.startDate || '',
+        endDate: editingBudget.endDate || '',
+        color: editingBudget.color || 'bg-blue-500',
+        status: editingBudget.status || 'activo',
+        spent: editingBudget.spent ? editingBudget.spent.toString() : '0',
+        
+        // Condiciones
+        paymentTerms: editingBudget.paymentTerms || '',
+        deliveryTime: editingBudget.deliveryTime || '',
+        warranty: editingBudget.warranty || '',
+        
+        // Notas adicionales
+        notes: editingBudget.notes || '',
+        specialClauses: editingBudget.specialClauses || '',
+        
+        // Persona responsable
+        responsibleName: editingBudget.responsibleName || '',
+        responsibleContact: editingBudget.responsibleContact || '',
       });
-    } else {
-      // Cuando se crea un nuevo presupuesto, asegurar que spent esté en 0
-      setFormData(prevFormData => ({
-        ...prevFormData,
-        spent: '0'
-      }));
     }
   }, [editingBudget]);
 
@@ -559,7 +1066,7 @@ const BudgetPage = () => {
                 setEditingBudget(null);
                 setShowAddModal(true);
               }}
-              className={`flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium 
+              className={`cursor-pointer flex items-center justify-center px-3 py-1.5 rounded-md text-sm font-medium 
                 ${darkMode 
                   ? 'bg-cyan-700 text-white hover:bg-cyan-600' 
                   : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
@@ -689,23 +1196,36 @@ const BudgetPage = () => {
                             setEditingBudget(budget);
                             setShowAddModal(true);
                           }}
-                          className={`p-1 rounded-full ${
+                          className={`cursor-pointer p-1 rounded-full ${
                             darkMode 
                               ? 'text-gray-300 hover:text-cyan-400 hover:bg-gray-600' 
                               : 'text-gray-500 hover:text-cyan-600 hover:bg-gray-100'
                           }`}
+                          title="Editar presupuesto"
                         >
                           <MdEdit className="h-5 w-5" />
                         </button>
                         <button 
                           onClick={() => showDeleteConfirmation(budget)}
-                          className={`p-1 rounded-full ${
+                          className={`cursor-pointer p-1 rounded-full ${
                             darkMode 
                               ? 'text-gray-300 hover:text-red-400 hover:bg-gray-600' 
                               : 'text-gray-500 hover:text-red-600 hover:bg-gray-100'
                           }`}
+                          title="Eliminar presupuesto"
                         >
                           <MdDelete className="h-5 w-5" />
+                        </button>
+                        <button 
+                          onClick={() => generatePDF(budget)}
+                          className={`cursor-pointer p-1 rounded-full ${
+                            darkMode 
+                              ? 'text-gray-300 hover:text-cyan-400 hover:bg-gray-600' 
+                              : 'text-gray-500 hover:text-cyan-600 hover:bg-gray-100'
+                          }`}
+                          title="Generar PDF"
+                        >
+                          <MdPictureAsPdf className="h-5 w-5" />
                         </button>
                       </div>
                     </td>
@@ -774,7 +1294,7 @@ const BudgetPage = () => {
         >
           <div 
             ref={setModalContentRef}
-            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-md w-full p-6`}
+            className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white'} rounded-xl shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto`}
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
@@ -801,223 +1321,562 @@ const BudgetPage = () => {
                 </div>
               )}
               
-              <div className="space-y-4 mb-6">
-                {/* Categoría */}
-                <div>
-                  <label htmlFor="category" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Categoría
-                  </label>
-                  <input
-                    type="text"
-                    id="category"
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    placeholder="Ej. Alimentación, Transporte, Entretenimiento"
-                    className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                    required
-                  />
-                </div>
-                
-                {/* Límite de presupuesto */}
-                <div>
-                  <label htmlFor="limit" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Límite de presupuesto
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
-                    </div>
-                    <input
-                      type="text"
-                      id="limit"
-                      name="limit"
-                      value={formData.limit}
-                      onChange={handleInputChange}
-                      placeholder="0.00"
-                      className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                      required
-                    />
+              {/* Pasos del formulario */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        currentStep === 1
+                          ? darkMode
+                            ? 'bg-cyan-600 text-white'
+                            : 'bg-cyan-600 text-white'
+                          : darkMode
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      1. Encabezado y Cliente
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        currentStep === 2
+                          ? darkMode
+                            ? 'bg-cyan-600 text-white'
+                            : 'bg-cyan-600 text-white'
+                          : darkMode
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      2. Detalles del Presupuesto
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        currentStep === 3
+                          ? darkMode
+                            ? 'bg-cyan-600 text-white'
+                            : 'bg-cyan-600 text-white'
+                          : darkMode
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      3. Condiciones y Notas
+                    </button>
                   </div>
-                  <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Cantidad máxima que planeas gastar en esta categoría
-                  </p>
                 </div>
                 
-                {/* Cantidad gastada - Solo visible al editar */}
-                {editingBudget && (
-                  <div>
-                    <label htmlFor="spent" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Cantidad gastada
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                {/* Paso 1: Encabezado y datos del cliente */}
+                {currentStep === 1 && (
+                  <div className="space-y-6">
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-6`}>
+                      <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Encabezado del Presupuesto</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Número de presupuesto */}
+                        <div>
+                          <label htmlFor="budgetNumber" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Número de Presupuesto
+                          </label>
+                          <input
+                            type="text"
+                            id="budgetNumber"
+                            name="budgetNumber"
+                            value={formData.budgetNumber}
+                            onChange={handleInputChange}
+                            placeholder="Ej. PRES-0001"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                          <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Si se deja vacío, se generará automáticamente
+                          </p>
+                        </div>
+                        
+                        {/* Fecha de emisión */}
+                        <div>
+                          <label htmlFor="issueDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Fecha de Emisión
+                          </label>
+                          <input
+                            type="date"
+                            id="issueDate"
+                            name="issueDate"
+                            value={formData.issueDate}
+                            onChange={handleInputChange}
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                        
+                        {/* Fecha de validez/expiración */}
+                        <div>
+                          <label htmlFor="expiryDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Fecha de Vigencia
+                          </label>
+                          <input
+                            type="date"
+                            id="expiryDate"
+                            name="expiryDate"
+                            value={formData.expiryDate}
+                            onChange={handleInputChange}
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                          <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Hasta cuándo es válido este presupuesto
+                          </p>
+                        </div>
                       </div>
-                      <input
-                        type="text"
-                        id="spent"
-                        name="spent"
-                        value={formData.spent}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                      />
                     </div>
-                    <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      Cantidad actual gastada en esta categoría (afecta al progreso de la barra)
-                    </p>
+                    
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Datos del Cliente</h3>
+                      <div className="space-y-4">
+                        {/* Nombre del cliente */}
+                        <div>
+                          <label htmlFor="clientName" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Nombre o Razón Social
+                          </label>
+                          <input
+                            type="text"
+                            id="clientName"
+                            name="clientName"
+                            value={formData.clientName}
+                            onChange={handleInputChange}
+                            placeholder="Ej. Juan Pérez / Empresa S.A."
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                        
+                        {/* Dirección del cliente */}
+                        <div>
+                          <label htmlFor="clientAddress" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Domicilio o Dirección
+                          </label>
+                          <input
+                            type="text"
+                            id="clientAddress"
+                            name="clientAddress"
+                            value={formData.clientAddress}
+                            onChange={handleInputChange}
+                            placeholder="Ej. Calle Principal #123, Ciudad"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                        
+                        {/* Contacto del cliente */}
+                        <div>
+                          <label htmlFor="clientContact" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Teléfono o Correo Electrónico
+                          </label>
+                          <input
+                            type="text"
+                            id="clientContact"
+                            name="clientContact"
+                            value={formData.clientContact}
+                            onChange={handleInputChange}
+                            placeholder="Ej. +52 123 456 7890 / cliente@ejemplo.com"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
                 
-                {/* Periodo del presupuesto */}
-                <div>
-                  <label htmlFor="period" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Periodo
-                  </label>
-                  <select
-                    id="period"
-                    name="period"
-                    value={formData.period}
-                    onChange={handleInputChange}
-                    className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                  >
-                    <option value="Mensual">Mensual</option>
-                    <option value="Semanal">Semanal</option>
-                    <option value="Quincenal">Quincenal</option>
-                    <option value="Trimestral">Trimestral</option>
-                    <option value="Anual">Anual</option>
-                  </select>
-                </div>
-                
-                {/* Fechas de inicio y fin */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="startDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Fecha de inicio
-                    </label>
-                    <input
-                      type="date"
-                      id="startDate"
-                      name="startDate"
-                      value={formData.startDate}
-                      onChange={handleInputChange}
-                      className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="endDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Fecha de fin
-                    </label>
-                    <input
-                      type="date"
-                      id="endDate"
-                      name="endDate"
-                      value={formData.endDate}
-                      onChange={handleInputChange}
-                      className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                {/* Descripción */}
-                <div>
-                  <label htmlFor="description" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Descripción (opcional)
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows="2"
-                    placeholder="Detalles o notas sobre este presupuesto"
-                    className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
-                  ></textarea>
-                </div>
-                
-                {/* Color del presupuesto */}
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Color
-                  </label>
-                  <div className="grid grid-cols-5 gap-2 mt-1">
-                    {['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 
-                      'bg-pink-500', 'bg-indigo-500', 'bg-teal-500', 'bg-orange-500', 'bg-gray-500'].map((color) => (
-                      <div 
-                        key={color}
-                        className={`h-8 w-8 rounded-full cursor-pointer ${color} transition-transform ${
-                          formData.color === color ? 'ring-2 ring-offset-2 ring-cyan-600 scale-110' : ''
-                        }`}
-                        onClick={() => {
-                          setFormData({...formData, color: color});
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Estado del presupuesto */}
-                <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Estado
-                  </label>
-                  <div className="flex space-x-4">
-                    <div 
-                      className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer flex-1 ${
-                        formData.status === 'activo' 
-                          ? `bg-green-50 border-green-500 ${darkMode ? 'bg-green-900 bg-opacity-20' : ''}` 
-                          : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                      onClick={() => setFormData({...formData, status: 'activo'})}
-                    >
-                      <div className={`h-4 w-4 rounded-full ${formData.status === 'activo' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                      <span className={`text-sm ${formData.status === 'activo' ? (darkMode ? 'text-green-400' : 'text-green-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-                        Activo
-                      </span>
+                {/* Paso 2: Detalles del presupuesto */}
+                {currentStep === 2 && (
+                  <div className="space-y-6">
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Detalles del Presupuesto</h3>
+                      <div className="space-y-4">
+                        {/* Categoría */}
+                        <div>
+                          <label htmlFor="category" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Categoría <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            id="category"
+                            name="category"
+                            value={formData.category}
+                            onChange={handleInputChange}
+                            placeholder="Ej. Alimentación, Transporte, Entretenimiento"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                            required
+                          />
+                        </div>
+                        
+                        {/* Descripción */}
+                        <div>
+                          <label htmlFor="description" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Descripción detallada
+                          </label>
+                          <textarea
+                            id="description"
+                            name="description"
+                            value={formData.description}
+                            onChange={handleInputChange}
+                            rows="3"
+                            placeholder="Describa detalladamente los productos o servicios incluidos en este presupuesto"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          ></textarea>
+                        </div>
+                        
+                        {/* Límite de presupuesto */}
+                        <div>
+                          <label htmlFor="limit" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Límite de presupuesto <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                            </div>
+                            <input
+                              type="text"
+                              id="limit"
+                              name="limit"
+                              value={formData.limit}
+                              onChange={handleInputChange}
+                              placeholder="0.00"
+                              className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                              required
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Cantidad gastada - Solo visible al editar */}
+                        {editingBudget && (
+                          <div>
+                            <label htmlFor="spent" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Cantidad gastada
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>$</span>
+                              </div>
+                              <input
+                                type="text"
+                                id="spent"
+                                name="spent"
+                                value={formData.spent}
+                                onChange={handleInputChange}
+                                placeholder="0.00"
+                                className={`block w-full pl-8 px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Periodo y fechas */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label htmlFor="period" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Periodo
+                            </label>
+                            <select
+                              id="period"
+                              name="period"
+                              value={formData.period}
+                              onChange={handleInputChange}
+                              className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                            >
+                              <option value="Mensual">Mensual</option>
+                              <option value="Semanal">Semanal</option>
+                              <option value="Quincenal">Quincenal</option>
+                              <option value="Trimestral">Trimestral</option>
+                              <option value="Anual">Anual</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="startDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Fecha de inicio <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              id="startDate"
+                              name="startDate"
+                              value={formData.startDate}
+                              onChange={handleInputChange}
+                              className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                              required
+                            />
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="endDate" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Fecha de fin <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="date"
+                              id="endDate"
+                              name="endDate"
+                              value={formData.endDate}
+                              onChange={handleInputChange}
+                              className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                              required
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Color y estado */}
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                          <div>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Color
+                            </label>
+                            <div className="grid grid-cols-5 gap-2">
+                              {['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-red-500', 'bg-yellow-500', 
+                                'bg-pink-500', 'bg-indigo-500', 'bg-teal-500', 'bg-orange-500', 'bg-gray-500'].map((color) => (
+                                <div 
+                                  key={color}
+                                  className={`h-8 w-8 rounded-full cursor-pointer ${color} transition-transform ${
+                                    formData.color === color ? 'ring-2 ring-offset-2 ring-cyan-600 scale-110' : ''
+                                  }`}
+                                  onClick={() => {
+                                    setFormData({...formData, color: color});
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                              Estado
+                            </label>
+                            <div className="flex space-x-4">
+                              <div 
+                                className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer flex-1 ${
+                                  formData.status === 'activo' 
+                                    ? `bg-green-50 border-green-500 ${darkMode ? 'bg-green-900 bg-opacity-20' : ''}` 
+                                    : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                                onClick={() => setFormData({...formData, status: 'activo'})}
+                              >
+                                <div className={`h-4 w-4 rounded-full ${formData.status === 'activo' ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                <span className={`text-sm ${formData.status === 'activo' ? (darkMode ? 'text-green-400' : 'text-green-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                                  Activo
+                                </span>
+                              </div>
+                              <div 
+                                className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer flex-1 ${
+                                  formData.status === 'inactivo' 
+                                    ? `bg-red-50 border-red-500 ${darkMode ? 'bg-red-900 bg-opacity-20' : ''}` 
+                                    : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
+                                }`}
+                                onClick={() => setFormData({...formData, status: 'inactivo'})}
+                              >
+                                <div className={`h-4 w-4 rounded-full ${formData.status === 'inactivo' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                <span className={`text-sm ${formData.status === 'inactivo' ? (darkMode ? 'text-red-400' : 'text-red-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                                  Inactivo
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div 
-                      className={`flex items-center gap-2 p-2 border rounded-lg cursor-pointer flex-1 ${
-                        formData.status === 'inactivo' 
-                          ? `bg-red-50 border-red-500 ${darkMode ? 'bg-red-900 bg-opacity-20' : ''}` 
-                          : darkMode ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                      onClick={() => setFormData({...formData, status: 'inactivo'})}
-                    >
-                      <div className={`h-4 w-4 rounded-full ${formData.status === 'inactivo' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                      <span className={`text-sm ${formData.status === 'inactivo' ? (darkMode ? 'text-red-400' : 'text-red-700') : (darkMode ? 'text-gray-300' : 'text-gray-700')}`}>
-                        Inactivo
-                      </span>
+                  </div>
+                )}
+                
+                {/* Paso 3: Condiciones y notas adicionales */}
+                {currentStep === 3 && (
+                  <div className="space-y-6">
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-6`}>
+                      <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Condiciones</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Forma de pago */}
+                        <div>
+                          <label htmlFor="paymentTerms" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Forma de Pago
+                          </label>
+                          <input
+                            type="text"
+                            id="paymentTerms"
+                            name="paymentTerms"
+                            value={formData.paymentTerms}
+                            onChange={handleInputChange}
+                            placeholder="Ej. Efectivo, Transferencia, Tarjeta"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                        
+                        {/* Tiempos de entrega */}
+                        <div>
+                          <label htmlFor="deliveryTime" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Tiempos de Entrega
+                          </label>
+                          <input
+                            type="text"
+                            id="deliveryTime"
+                            name="deliveryTime"
+                            value={formData.deliveryTime}
+                            onChange={handleInputChange}
+                            placeholder="Ej. 15 días hábiles"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                        
+                        {/* Garantías */}
+                        <div>
+                          <label htmlFor="warranty" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Garantías
+                          </label>
+                          <input
+                            type="text"
+                            id="warranty"
+                            name="warranty"
+                            value={formData.warranty}
+                            onChange={handleInputChange}
+                            placeholder="Ej. 1 año en partes y mano de obra"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'} mb-6`}>
+                      <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Notas Adicionales</h3>
+                      <div className="space-y-4">
+                        {/* Observaciones */}
+                        <div>
+                          <label htmlFor="notes" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Observaciones
+                          </label>
+                          <textarea
+                            id="notes"
+                            name="notes"
+                            value={formData.notes}
+                            onChange={handleInputChange}
+                            rows="3"
+                            placeholder="Observaciones o aclaraciones importantes sobre el presupuesto"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          ></textarea>
+                        </div>
+                        
+                        {/* Cláusulas especiales */}
+                        <div>
+                          <label htmlFor="specialClauses" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Cláusulas Especiales
+                          </label>
+                          <textarea
+                            id="specialClauses"
+                            name="specialClauses"
+                            value={formData.specialClauses}
+                            onChange={handleInputChange}
+                            rows="3"
+                            placeholder="Ej. Penalizaciones por cancelación, condiciones especiales, etc."
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          ></textarea>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                      <h3 className={`text-lg font-medium mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>Datos de Contacto</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Nombre del responsable */}
+                        <div>
+                          <label htmlFor="responsibleName" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Nombre del Responsable
+                          </label>
+                          <input
+                            type="text"
+                            id="responsibleName"
+                            name="responsibleName"
+                            value={formData.responsibleName}
+                            onChange={handleInputChange}
+                            placeholder="Nombre de la persona que emite el presupuesto"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                        
+                        {/* Contacto del responsable */}
+                        <div>
+                          <label htmlFor="responsibleContact" className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Contacto del Responsable
+                          </label>
+                          <input
+                            type="text"
+                            id="responsibleContact"
+                            name="responsibleContact"
+                            value={formData.responsibleContact}
+                            onChange={handleInputChange}
+                            placeholder="Teléfono o correo del responsable"
+                            className={`block w-full px-3 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
               
-              <div className="flex justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={closeModal}
-                  className={`px-4 py-2 cursor-pointer ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} border rounded-lg`}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 cursor-pointer bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 flex items-center ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {editingBudget ? "Actualizando..." : "Creando..."}
-                    </>
-                  ) : editingBudget ? "Guardar Cambios" : "Crear Presupuesto" }
-                </button>
+              {/* Botones de navegación y envío */}
+              <div className="flex justify-between mt-6">
+                <div>
+                  {currentStep > 1 && (
+                    <button
+                      type="button"
+                      onClick={prevStep}
+                      className={`px-4 py-2 border rounded-lg ${
+                        darkMode
+                          ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      Anterior
+                    </button>
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={closeModal}
+                    className={`px-4 py-2 border rounded-lg ${
+                      darkMode
+                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Cancelar
+                  </button>
+                  
+                  {currentStep < totalSteps ? (
+                    <button
+                      type="button"
+                      onClick={nextStep}
+                      className={`px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700`}
+                    >
+                      Siguiente
+                    </button>
+                  ) : (
+                    <button 
+                      type="submit"
+                      disabled={loading}
+                      className={`px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 flex items-center ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    >
+                      {loading ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          {editingBudget ? "Actualizando..." : "Creando..."}
+                        </>
+                      ) : editingBudget ? "Guardar Cambios" : "Crear Presupuesto" }
+                    </button>
+                  )}
+                </div>
               </div>
             </form>
           </div>
